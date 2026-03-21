@@ -1,0 +1,168 @@
+# ============================================================
+# Configuração para Portais de Notícias e Blogs
+# Suporta HTML estático e feeds RSS/Atom
+# ============================================================
+
+spider_type: news
+name: "portal-noticias"
+description: "Spider para portais de notícias, blogs e feeds RSS"
+
+# URLs de entrada — página inicial, seções ou feed RSS
+start_urls:
+  - "https://portal.exemplo.com"
+  - "https://portal.exemplo.com/politica"
+  - "https://portal.exemplo.com/tecnologia"
+
+# Feed RSS/Atom (alternativa ou complemento ao scraping HTML)
+rss_feed:
+  enabled: false            # true = usa RSS como fonte primária
+  url: "https://portal.exemplo.com/feed"
+  format: "rss"             # rss | atom | json_feed
+  fetch_full_content: true  # Buscar página completa de cada artigo
+
+# Configurações de rastreamento para portais de notícias
+crawl_settings:
+  depth: 2                  # Página de seção → Artigo individual
+  follow_links: true
+  allowed_domains:
+    - "portal.exemplo.com"
+  render_js: false          # Maioria dos portais é HTML estático
+  delay_min: 1.0
+  delay_max: 3.0
+  rate_limit: 2
+  timeout: 30
+  retry_times: 3
+  user_agent: "auto"
+  # Coletar apenas notícias das últimas N horas
+  max_age_hours: 24         # 0 = sem limite de tempo
+
+# Filtros de URL — padrões que indicam páginas de artigo
+url_filters:
+  include_patterns:
+    - "/noticia/"
+    - "/artigo/"
+    - "/news/"
+    - "/post/"
+    - r"/\d{4}/\d{2}/\d{2}/"  # Data na URL (regex)
+  exclude_patterns:
+    - "/categoria/"
+    - "/tag/"
+    - "/autor/"
+    - "/busca/"
+    - "/login"
+    - "/cadastro"
+
+# Extração de dados do artigo
+extraction:
+  item_selector: "article, .noticia, .post, .article-body, main"
+
+  fields:
+    # Título principal do artigo
+    titulo:
+      selector: "h1.titulo, h1.headline, h1[itemprop='headline'], article h1"
+      type: "text"
+      required: true
+      strip: true
+
+    # Subtítulo ou lead
+    subtitulo:
+      selector: ".subtitulo, .lead, .subtitle, .summary, [itemprop='description']"
+      type: "text"
+      required: false
+
+    # Nome do autor
+    autor:
+      selector: "[itemprop='author'] [itemprop='name'], .autor, .author-name, .byline"
+      attr: "content"
+      fallback_selector: ".autor, .author"
+      type: "text"
+      required: false
+
+    # Data e hora de publicação
+    data_publicacao:
+      selector: "[itemprop='datePublished'], time.publicado, .data-publicacao, .published-date"
+      attr: "datetime"
+      fallback_attr: "content"
+      type: "text"
+      transform: "to_date"   # Normaliza para ISO 8601
+      required: true
+
+    # Data de atualização
+    data_atualizacao:
+      selector: "[itemprop='dateModified'], time.atualizado, .data-atualizacao"
+      attr: "datetime"
+      type: "text"
+      transform: "to_date"
+      required: false
+
+    # Conteúdo completo do artigo
+    conteudo:
+      selector: ".conteudo-materia, .article-body, [itemprop='articleBody'], .post-content"
+      type: "text"
+      strip: true
+      required: true
+
+    # Conteúdo em HTML (mantém formatação)
+    conteudo_html:
+      selector: ".conteudo-materia, .article-body, [itemprop='articleBody']"
+      type: "html"
+      required: false
+
+    # Tags/palavras-chave
+    tags:
+      selector: ".tags a, .keywords a, [rel='tag'], .tag-list a"
+      type: "text"
+      multiple: true         # Lista de tags
+      required: false
+
+    # Categoria da notícia
+    categoria:
+      selector: ".categoria a, .section-name, .breadcrumb li:nth-child(2)"
+      type: "text"
+      required: false
+
+    # Imagem de capa
+    imagem_capa:
+      selector: "[itemprop='image'] img, .foto-materia img, .featured-image img, article figure img"
+      attr: "src"
+      type: "url"
+      required: false
+
+    # Legenda da imagem
+    legenda_imagem:
+      selector: "[itemprop='image'] figcaption, .foto-legenda, .image-caption"
+      type: "text"
+      required: false
+
+    # URL canônica do artigo
+    url:
+      selector: "link[rel='canonical']"
+      attr: "href"
+      type: "url"
+      required: false
+
+    # Número de comentários
+    comentarios:
+      selector: ".comment-count, .comentarios-count, [class*='comment-count']"
+      type: "text"
+      transform: "to_int"
+      required: false
+
+# Paginação para listar artigos
+pagination:
+  enabled: true
+  selector: "a.proxima, a.next, [rel='next'], .pagination a[class*='next']"
+  max_pages: 20
+
+# Saída
+output:
+  save_raw_html: false
+  deduplicate: true
+  dedup_field: "url"
+  format: "json"
+
+# Metadados
+metadata:
+  include_scraped_at: true
+  include_source_url: true
+  include_spider_name: true

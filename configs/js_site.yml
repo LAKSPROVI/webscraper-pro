@@ -1,0 +1,155 @@
+# ============================================================
+# Configuração para Sites com JavaScript (SPAs)
+# Usa Playwright para renderizar conteúdo dinâmico
+# Ideal para React, Vue, Angular e outros frameworks SPA
+# ============================================================
+
+spider_type: js
+name: "spa-moderno"
+description: "Spider para SPAs e sites que requerem renderização JavaScript"
+
+# URLs de entrada — SPAs e sites com conteúdo dinâmico
+start_urls:
+  - "https://app.exemplo.com/listagem"
+
+# Ativar renderização JavaScript via Playwright
+render_js: true
+
+# Configurações do Playwright
+playwright_settings:
+  # Aguardar este seletor aparecer antes de extrair dados
+  wait_for_selector: ".conteudo-carregado, [data-loaded='true'], .items-container"
+
+  # Aguardar estado de rede "idle" (sem requisições pendentes)
+  wait_for_network_idle: true
+  network_idle_timeout: 3000  # ms — aguardar 3s sem requisições
+
+  # Tempo máximo para aguardar carregamento (ms)
+  page_timeout: 60000
+
+  # Rolar até o final da página (útil para lazy loading)
+  scroll_to_bottom: true
+  scroll_step: 800            # Pixels por scroll
+  scroll_delay: 0.5           # Segundos entre scrolls
+  wait_after_scroll: 2        # Segundos após scroll final
+
+  # Capturar screenshot em caso de erro (para debug)
+  take_screenshot_on_error: true
+  screenshot_path: "logs/screenshots/"
+
+  # Bloquear recursos desnecessários para acelerar carregamento
+  # Reduz uso de banda e tempo de carregamento até 70%
+  block_resources:
+    - "image"        # Imagens (a menos que sejam dados)
+    - "font"         # Fontes web
+    - "stylesheet"   # CSS (o conteúdo já está renderizado)
+    - "media"        # Vídeos e áudios
+
+  # Bloquear domínios de analytics/publicidade
+  block_domains:
+    - "google-analytics.com"
+    - "googletagmanager.com"
+    - "doubleclick.net"
+    - "facebook.net"
+    - "hotjar.com"
+
+  # Viewport da janela do browser
+  viewport:
+    width: 1280
+    height: 800
+
+  # Emular dispositivo móvel (opcional)
+  emulate_mobile: false
+  mobile_device: "iPhone 12"  # Usado se emulate_mobile=true
+
+  # Interações antes de extrair dados (ex: fechar popup, fazer login)
+  pre_actions:
+    - action: "wait_for_selector"
+      selector: ".cookie-banner"
+      timeout: 3000
+    - action: "click"
+      selector: ".cookie-accept, #accept-cookies, .dismiss-cookies"
+      ignore_error: true      # Não falhar se popup não existir
+    - action: "wait"
+      seconds: 1
+
+  # Ações para carregar mais itens (infinite scroll ou botão "carregar mais")
+  load_more:
+    enabled: true
+    type: "button"            # button | scroll | pagination
+    button_selector: "button.carregar-mais, .load-more-btn, [data-action='load-more']"
+    max_clicks: 20            # Máximo de cliques no botão
+    wait_after_click: 2       # Segundos após cada clique
+
+# Configurações de rastreamento
+crawl_settings:
+  depth: 2
+  follow_links: false         # SPAs geralmente têm navegação interna
+  render_js: true             # Sempre true para spider tipo js
+  delay_min: 2.0              # SPAs são mais lentas, delay maior
+  delay_max: 5.0
+  rate_limit: 1               # Máximo 1 req/seg — Playwright é pesado
+  timeout: 90                 # Timeout maior para SPAs
+  retry_times: 2
+  user_agent: "auto"
+
+# Extração de dados (CSS/XPath como de costume, após renderização)
+extraction:
+  item_selector: ".item-card, .produto-card, [data-item], li.list-item"
+
+  fields:
+    titulo:
+      selector: ".item-titulo, h3.nome, [data-testid='title']"
+      type: "text"
+      required: true
+
+    descricao:
+      selector: ".item-desc, .descricao, [data-testid='description']"
+      type: "text"
+      required: false
+
+    preco:
+      selector: "[data-price], .preco, .price-value"
+      attr: "data-price"
+      fallback_selector: ".preco, .price"
+      type: "text"
+      transform: "to_float"
+      required: false
+
+    id_item:
+      selector: "[data-id], [data-product-id]"
+      attr: "data-id"
+      type: "text"
+      required: false
+
+    imagem:
+      selector: "img.item-image, [data-src]"
+      attr: "src"
+      fallback_attr: "data-src"  # Lazy-loaded images
+      type: "url"
+      required: false
+
+# Paginação em SPAs (geralmente via parâmetros de URL ou clique)
+pagination:
+  enabled: true
+  type: "url_parameter"      # url_parameter | click | api_call
+  param: "page"
+  start: 1
+  max_pages: 20
+
+  # Alternativa: paginação por clique em botão
+  # type: "click"
+  # selector: "[data-testid='next-page'], .btn-proximo"
+  # wait_after_click: 2
+
+# Saída
+output:
+  save_raw_html: false
+  deduplicate: true
+  dedup_field: "id_item"
+  format: "json"
+
+# Cache do navegador (reutilizar entre requisições)
+browser_cache:
+  enabled: true
+  cache_dir: ".playwright_cache"

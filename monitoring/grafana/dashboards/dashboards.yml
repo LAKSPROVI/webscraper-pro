@@ -1,0 +1,32 @@
+# =============================================================================
+# dashboards.yml — Provisionamento automático de Dashboards no Grafana
+# =============================================================================
+# Configura o Grafana para carregar dashboards automaticamente de um diretório.
+# Dashboards em formato JSON podem ser colocados em ./monitoring/grafana/dashboards/
+#
+# Localização no container: /etc/grafana/provisioning/dashboards/
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+
+  # ---------------------------------------------------------------------------
+  # Provedor de dashboards do sistema de arquivos local
+  # ---------------------------------------------------------------------------
+  - name: 'WebScraper Dashboards'
+    orgId: 1
+    folder: 'WebScraper'
+    folderUid: 'webscraper'
+    type: file
+    # Não permite deleção via UI (apenas via arquivo)
+    disableDeletion: true
+    # Recarrega automaticamente quando arquivos mudam
+    updateIntervalSeconds: 30
+    # Permite que usuários editem no UI (mudanças não são salvas no arquivo)
+    allowUiUpdates: false
+    options:
+      # Caminho dentro do container para os arquivos JSON de dashboards
+      path: /etc/grafana/provisioning/dashboards
+      # Busca recursivamente em subdiretórios
+      foldersFromFilesStructure: true

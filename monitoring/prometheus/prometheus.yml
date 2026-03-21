@@ -1,0 +1,180 @@
+# =============================================================================
+# prometheus.yml — Configuração do Prometheus para o WebScraper Jurídico
+# =============================================================================
+# Coleta métricas de:
+#   - FastAPI (scraper-api) via endpoint /metrics
+#   - Redis (redis-exporter) via redis_exporter
+#   - PostgreSQL via postgres_exporter
+#   - Celery/Flower via endpoint do Flower
+#   - Prometheus si mesmo
+#
+# Retenção: 30 dias (configurado via CLI no docker-compose)
+# =============================================================================
+
+global:
+  # Intervalo padrão de coleta de métricas
+  scrape_interval: 15s
+
+  # Timeout padrão para cada scrape
+  scrape_timeout: 10s
+
+  # Intervalo de avaliação de regras e alertas
+  evaluation_interval: 15s
+
+  # Labels adicionados a todos os dados coletados (útil para identificar o ambiente)
+  external_labels:
+    monitor: 'webscraper-monitor'
+    environment: 'production'
+    project: 'webscraper-juridico'
+
+# =============================================================================
+# REGRAS DE ALERTA — Arquivos de regras
+# =============================================================================
+# (opcional) Carrega arquivos com regras de alertas e recording rules
+# rule_files:
+#   - "/etc/prometheus/rules/*.yml"
+
+# =============================================================================
+# SCRAPE CONFIGS — Fontes de métricas
+# =============================================================================
+scrape_configs:
+
+  # ---------------------------------------------------------------------------
+  # Prometheus — monitoramento próprio
+  # ---------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+  # ---------------------------------------------------------------------------
+  # FastAPI — API do WebScraper
+  # ---------------------------------------------------------------------------
+  # Requer: pip install prometheus-fastapi-instrumentator
+  # Adicionar no main.py:
+  #   from prometheus_fastapi_instrumentator import Instrumentator
+  #   Instrumentator().instrument(app).expose(app)
+  - job_name: 'scraper-api'
+    # Coleta a cada 15 segundos
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['scraper-api:8000']
+        labels:
+          service: 'scraper-api'
+          component: 'api'
+    # Caminho do endpoint de métricas
+    metrics_path: '/metrics'
+    # Esquema HTTP (não HTTPS dentro da rede interna)
+    scheme: http
+
+  # ---------------------------------------------------------------------------
+  # Redis — Métricas de cache e broker
+  # ---------------------------------------------------------------------------
+  # Requer: adicionar redis-exporter ao docker-compose (imagem: oliver006/redis_exporter)
+  # Por enquanto, usa o endpoint de informações básicas do Redis
+  # Para usar o redis_exporter, adicione:
+  #   - job_name: 'redis-exporter'
+  #     static_configs:
+  #       - targets: ['redis-exporter:9121']
+  #
+  # Configuração alternativa via blackbox (ping básico)
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['redis:6379']
+        labels:
+          service: 'redis'
+          component: 'cache-broker'
+    # Nota: Redis não expõe métricas Prometheus nativamente.
+    # Use redis_exporter para métricas completas (ver comentário acima).
+    # Esta entrada é para documentação/futura integração.
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Banco de dados
+  # ---------------------------------------------------------------------------
+  # Requer: adicionar postgres_exporter ao docker-compose
+  # Imagem: prometheuscommunity/postgres-exporter
+  # Para uso completo, adicione ao docker-compose:
+  #   postgres-exporter:
+  #     image: prometheuscommunity/postgres-exporter:v0.15.0
+  #     environment:
+  #       DATA_SOURCE_NAME: postgresql://scraper:senha@postgres:5432/webscraper?sslmode=disable
+  - job_name: 'postgres'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['postgres:5432']
+        labels:
+          service: 'postgres'
+          component: 'database'
+    # Nota: requer postgres_exporter para métricas reais
+
+  # ---------------------------------------------------------------------------
+  # Celery Flower — Monitor de workers Celery
+  # ---------------------------------------------------------------------------
+  # O Flower expõe métricas Prometheus no endpoint /metrics
+  - job_name: 'celery-flower'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    static_configs:
+      - targets: ['scraper-flower:5555']
+        labels:
+          service: 'celery'
+          component: 'task-queue'
+    metrics_path: '/metrics'
+    scheme: http
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker — Métricas dos workers
+  # ---------------------------------------------------------------------------
+  # Requer: celery[prometheus] ou celery-exporter
+  # Os workers expõem métricas na porta 8888 quando configurados com
+  # celery_worker_state_db e CELERY_WORKER_HIJACK_ROOT_LOGGER
+  - job_name: 'celery-worker'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['scraper-worker:8888']
+        labels:
+          service: 'celery-worker'
+          component: 'worker'
+    metrics_path: '/metrics'
+    scheme: http
+
+  # ---------------------------------------------------------------------------
+  # Loki — Métricas do sistema de logs
+  # ---------------------------------------------------------------------------
+  - job_name: 'loki'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          service: 'loki'
+          component: 'logging'
+    metrics_path: '/metrics'
+    scheme: http
+
+  # ---------------------------------------------------------------------------
+  # Grafana — Métricas do Grafana
+  # ---------------------------------------------------------------------------
+  - job_name: 'grafana'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+          component: 'monitoring'
+    metrics_path: '/metrics'
+    scheme: http
+
+# =============================================================================
+# ALERTMANAGER — Configuração de alertas (opcional)
+# =============================================================================
+# Descomente e configure para receber alertas via Slack, email, PagerDuty, etc.
+#
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093

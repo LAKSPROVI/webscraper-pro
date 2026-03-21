@@ -1,0 +1,57 @@
+# =============================================================================
+# .gitignore — WebScraper Jurídico
+# =============================================================================
+
+# Variáveis de ambiente com dados sensíveis (NUNCA versionar)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Dados gerados pelos containers (não versionar)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Caches Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Playwright
+playwright-report/
+test-results/
+
+# Docker volumes (se montados localmente)
+data/
+
+# Uploads e outputs temporários
+uploads/
+temp/
+downloads/

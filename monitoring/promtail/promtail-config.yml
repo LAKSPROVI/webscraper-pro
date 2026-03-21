@@ -1,0 +1,172 @@
+# =============================================================================
+# promtail-config.yml — Configuração do Grafana Promtail 2.9
+# =============================================================================
+# Promtail é o agente que coleta logs e os envia para o Loki.
+# Funciona de forma similar ao Filebeat (ELK) mas para o Loki.
+#
+# Fluxo: Containers Docker → Promtail → Loki → Grafana
+# =============================================================================
+
+# =============================================================================
+# SERVER — Servidor HTTP do Promtail (para healthcheck e métricas)
+# =============================================================================
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# =============================================================================
+# POSITIONS — Arquivo que rastreia onde o Promtail parou de ler
+# =============================================================================
+# Importante: garante que logs não sejam perdidos em caso de restart
+positions:
+  filename: /tmp/positions.yaml
+
+# =============================================================================
+# CLIENTS — Para onde enviar os logs
+# =============================================================================
+clients:
+  # Envia logs para o Loki na rede interna Docker
+  - url: http://loki:3100/loki/api/v1/push
+    # Timeout para envio de lotes
+    batchwait: 1s
+    # Tamanho máximo do lote (bytes)
+    batchsize: 1048576
+    # Configurações de retry
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+# =============================================================================
+# SCRAPE CONFIGS — O que coletar
+# =============================================================================
+scrape_configs:
+
+  # ---------------------------------------------------------------------------
+  # Logs dos containers Docker via API Docker
+  # ---------------------------------------------------------------------------
+  - job_name: 'docker-containers'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          # Apenas containers da rede scraper-net
+          - name: network
+            values: ['scraper-net']
+    relabel_configs:
+      # Usa o nome do container como label 'container'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+      # Usa a imagem como label 'image'
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+
+      # Adiciona label com o ID do container
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+
+      # Usa labels Docker como labels Loki
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+
+      # Ambiente (para distinguir dev/prod)
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+
+    # Pipeline de transformação dos logs
+    pipeline_stages:
+      # Tenta parsear como JSON (logs estruturados)
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            logger: logger
+
+      # Se não for JSON, tenta detectar o nível pelo conteúdo
+      - regex:
+          expression: '(?i)(?P<level>debug|info|warning|warn|error|critical|fatal)'
+
+      # Normaliza o nível de log
+      - template:
+          source: level
+          template: '{{ ToLower .Value }}'
+
+      # Adiciona o nível como label (permite filtrar por nível no Grafana)
+      - labels:
+          level:
+
+      # Remove campos internos do JSON para não inflar os logs
+      - output:
+          source: message
+
+  # ---------------------------------------------------------------------------
+  # Logs da API FastAPI
+  # ---------------------------------------------------------------------------
+  - job_name: 'scraper-api'
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          service: 'scraper-api'
+          component: 'api'
+          __path__: '/var/log/scraper/api/*.log'
+    pipeline_stages:
+      # Parseia logs JSON do Uvicorn/FastAPI
+      - json:
+          expressions:
+            level: levelname
+            message: message
+            timestamp: asctime
+            module: module
+            request_id: request_id
+      - labels:
+          level:
+          module:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05,000'
+
+  # ---------------------------------------------------------------------------
+  # Logs do Worker Celery
+  # ---------------------------------------------------------------------------
+  - job_name: 'scraper-worker'
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          service: 'scraper-worker'
+          component: 'worker'
+          __path__: '/var/log/scraper/worker/*.log'
+    pipeline_stages:
+      # Logs do Celery têm formato específico
+      - regex:
+          expression: '^\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\] (?P<level>\w+)/(?P<process>\w+).*$'
+      - labels:
+          level:
+          process:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05,000'
+
+  # ---------------------------------------------------------------------------
+  # Logs do sistema (syslog, kernel, etc.)
+  # ---------------------------------------------------------------------------
+  - job_name: 'system'
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          service: 'system'
+          component: 'os'
+          __path__: '/var/log/{syslog,messages,kern.log}'
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w+ \d+ \d{2}:\d{2}:\d{2}) (?P<host>\S+) (?P<service>\S+): (?P<message>.*)$'
+      - labels:
+          host:
+      - timestamp:
+          source: timestamp
+          format: 'Jan 02 15:04:05'

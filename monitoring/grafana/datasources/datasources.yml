@@ -1,0 +1,61 @@
+# =============================================================================
+# datasources.yml — Provisionamento automático de Datasources no Grafana
+# =============================================================================
+# Este arquivo configura automaticamente as fontes de dados do Grafana.
+# Ao iniciar, o Grafana lerá este arquivo e criará os datasources.
+#
+# Localização no container: /etc/grafana/provisioning/datasources/
+# =============================================================================
+
+apiVersion: 1
+
+# Lista de datasources a provisionar
+datasources:
+
+  # ---------------------------------------------------------------------------
+  # Prometheus — Métricas
+  # ---------------------------------------------------------------------------
+  - name: Prometheus
+    type: prometheus
+    # Acesso direto (server-side, mais seguro que proxy)
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    # Atualiza se já existir
+    editable: false
+    jsonData:
+      # Scrape interval padrão (deve corresponder ao do prometheus.yml)
+      timeInterval: '15s'
+      # Habilita exemplares (traces correlacionados com métricas)
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: ''
+      # Habilita Prometheus Query Language
+      prometheusType: Prometheus
+      prometheusVersion: '2.47.0'
+      # Cache de queries
+      cacheLevel: 'High'
+      # Incremento de passo de query
+      incrementalQueryOverlapWindow: '10m'
+
+  # ---------------------------------------------------------------------------
+  # Loki — Logs
+  # ---------------------------------------------------------------------------
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+    jsonData:
+      # Tamanho máximo de linhas retornadas por query
+      maxLines: 1000
+      # Timeout de query Loki
+      timeout: 60
+      # Derivadas para correlação de logs com métricas
+      derivedFields:
+        # Extrai trace_id dos logs para correlação
+        - name: 'TraceID'
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: ''
+          datasourceUid: ''

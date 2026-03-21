@@ -1,0 +1,181 @@
+# =============================================================================
+# loki-config.yml — Configuração do Grafana Loki 2.9
+# =============================================================================
+# Loki é o sistema de agregação de logs (similar ao Elasticsearch, mas mais leve)
+# Funciona como backend para Grafana (datasource "Loki")
+#
+# Arquitetura básica (modo single-process):
+#   Promtail → Loki → Grafana
+#
+# Para produção com alta carga, considere o modo distribuído (microservices)
+# =============================================================================
+
+# Modo de autenticação (false = sem autenticação, adequado para uso interno)
+auth_enabled: false
+
+# =============================================================================
+# SERVIDOR HTTP
+# =============================================================================
+server:
+  # Porta HTTP para receber logs e queries
+  http_listen_port: 3100
+
+  # Porta gRPC (usada para comunicação interna em cluster)
+  grpc_listen_port: 9096
+
+  # Logs do próprio Loki
+  log_level: info
+
+  # Tamanho máximo de mensagem gRPC (5MB)
+  grpc_server_max_recv_msg_size: 5242880
+  grpc_server_max_send_msg_size: 5242880
+
+# =============================================================================
+# INGESTER — Componente que recebe e armazena logs em memória
+# =============================================================================
+ingester:
+  # Configurações do WAL (Write-Ahead Log) para durabilidade
+  wal:
+    enabled: true
+    dir: /loki/wal
+
+  # Ciclo de vida dos chunks (blocos de logs em memória)
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+
+  # Tempo de inatividade antes de finalizar um chunk
+  chunk_idle_period: 5m
+
+  # Tempo máximo que um chunk pode ficar ativo
+  max_chunk_age: 1h
+
+  # Tamanho alvo de cada chunk comprimido
+  chunk_target_size: 1048576
+
+  # Algoritmo de compressão dos chunks (snappy é rápido, gzip é mais compacto)
+  chunk_encoding: snappy
+
+  # Tempo de retenção de chunks não-flushed em memória
+  chunk_retain_period: 30s
+
+  # Número máximo de chunks em memória por stream
+  max_transfer_retries: 0
+
+# =============================================================================
+# STORAGE CONFIG — Onde os dados são armazenados
+# =============================================================================
+storage_config:
+  # Filesystem local para dados BoltDB (índice)
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+
+  # Filesystem local para chunks
+  filesystem:
+    directory: /loki/chunks
+
+# =============================================================================
+# SCHEMA CONFIG — Esquema de armazenamento e indexação
+# =============================================================================
+schema_config:
+  configs:
+    # Esquema ativo a partir desta data
+    - from: 2023-01-01
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        # Período de cada tabela de índice (1 dia = boa granularidade)
+        period: 24h
+
+# =============================================================================
+# COMPACTOR — Compacta e gerencia índices antigos
+# =============================================================================
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  # Retenção de dados (30 dias)
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+# =============================================================================
+# LIMITS CONFIG — Limites globais e por tenant
+# =============================================================================
+limits_config:
+  # Retenção global de logs (30 dias)
+  retention_period: 720h
+
+  # Taxa máxima de ingestão por tenant (MB/s)
+  ingestion_rate_mb: 16
+
+  # Burst máximo de ingestão (MB)
+  ingestion_burst_size_mb: 32
+
+  # Número máximo de streams ativos por tenant
+  max_streams_per_user: 10000
+
+  # Tamanho máximo de uma query
+  max_query_length: 721h
+
+  # Número máximo de entradas por query
+  max_entries_limit_per_query: 5000
+
+  # Paralelismo máximo de queries por tenant
+  max_query_parallelism: 32
+
+  # Tamanho máximo de um log único (1MB)
+  max_line_size: 1048576
+
+  # Permite desordem em timestamps (útil para logs de múltiplas fontes)
+  unordered_writes: true
+
+  # Janela de tempo para rejeitar logs muito antigos (1 hora)
+  reject_old_samples: true
+  reject_old_samples_max_age: 1h
+
+# =============================================================================
+# CHUNK STORE CONFIG — Cache de chunks
+# =============================================================================
+chunk_store_config:
+  # Retenção máxima de chunks em cache
+  max_look_back_period: 0s
+
+# =============================================================================
+# TABLE MANAGER — Gerenciamento de tabelas de índice
+# =============================================================================
+table_manager:
+  # Garante que tabelas sejam criadas automaticamente
+  retention_deletes_enabled: true
+  # Período de retenção (30 dias)
+  retention_period: 720h
+
+# =============================================================================
+# RULER — Regras de alertas baseadas em logs (opcional)
+# =============================================================================
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://localhost:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+
+# =============================================================================
+# ANALYTICS — Desabilita telemetria
+# =============================================================================
+analytics:
+  reporting_enabled: false

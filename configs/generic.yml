@@ -1,0 +1,95 @@
+# ============================================================
+# Configuração do Spider Genérico
+# Funciona para qualquer site com seletores CSS/XPath
+# Edite os campos abaixo conforme o site-alvo
+# ============================================================
+
+spider_type: generic
+name: "meu-site"
+description: "Spider genérico configurável para qualquer site"
+
+# URLs de entrada — pode ser uma lista com múltiplas páginas iniciais
+start_urls:
+  - "https://exemplo.com/produtos"
+
+# Configurações de rastreamento (crawl)
+crawl_settings:
+  depth: 2                  # Profundidade máxima de links a seguir
+  follow_links: true        # Seguir links encontrados na página
+  allowed_domains: []       # Vazio = qualquer domínio. Ex: ["exemplo.com"]
+  render_js: false          # true = usa Playwright para renderizar JS
+  delay_min: 1.5            # Delay mínimo entre requisições (segundos)
+  delay_max: 4.0            # Delay máximo entre requisições (segundos)
+  rate_limit: 2             # Requisições por segundo (máximo)
+  timeout: 30               # Timeout por requisição (segundos)
+  retry_times: 3            # Número de tentativas em caso de falha
+  user_agent: "auto"        # "auto" = rotaciona user agents automaticamente
+
+# Configurações de extração de dados
+extraction:
+  # Seletor CSS para identificar cada item/registro na página
+  item_selector: ".produto, article, .item"
+
+  # Campos a extrair de cada item
+  fields:
+    titulo:
+      selector: "h1, h2, .titulo"
+      type: "text"          # text | html | attr | url
+      required: true        # Lança aviso se campo não encontrado
+      strip: true           # Remove espaços em branco
+
+    descricao:
+      selector: ".descricao, .description, p"
+      type: "text"
+      required: false
+      max_length: 2000      # Trunca texto longo
+
+    preco:
+      selector: ".preco, .price, span[class*='price']"
+      type: "text"
+      transform: "to_float"  # Converte "R$ 1.299,90" → 1299.90
+      required: false
+
+    imagem:
+      selector: "img.principal, .foto img, picture img"
+      attr: "src"            # Extrai atributo src da tag
+      type: "url"            # Normaliza URL relativa para absoluta
+      required: false
+
+    link:
+      selector: "a.ver-mais, a.detalhes, a[href]"
+      attr: "href"
+      type: "url"
+      required: false
+
+    data:
+      selector: "time, .data, .date"
+      attr: "datetime"       # Tenta atributo datetime primeiro
+      type: "text"
+      transform: "to_date"   # Converte para formato ISO 8601
+      required: false
+
+# Configurações de paginação
+pagination:
+  enabled: true
+  selector: "a.proxima, a.next, [rel='next'], .pagination .next"
+  max_pages: 10             # Limite de páginas a percorrer
+
+# Configurações de saída
+output:
+  save_raw_html: false      # Salvar HTML bruto junto com os dados
+  deduplicate: true         # Remover itens duplicados por URL
+  dedup_field: "link"       # Campo usado para deduplicação
+  format: "json"            # json | csv | jsonl
+
+# Configurações de proxy (opcional)
+proxy:
+  enabled: false
+  rotate: true              # Rotacionar proxies a cada N requisições
+  rotate_every: 10
+
+# Configurações de cookies/sessão (opcional)
+session:
+  cookies: {}
+  headers:
+    Accept-Language: "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"

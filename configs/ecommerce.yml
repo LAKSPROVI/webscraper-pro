@@ -1,0 +1,156 @@
+# ============================================================
+# Configuração otimizada para E-Commerce
+# Coleta produtos, preços, estoque, avaliações e categorias
+# Taxa de requisição reduzida para ser mais respeitoso
+# ============================================================
+
+spider_type: generic
+name: "ecommerce"
+description: "Spider para lojas online — coleta produtos, preços e estoque"
+
+# URLs de entrada — categorias ou páginas de busca
+start_urls:
+  - "https://loja.exemplo.com/produtos"
+  - "https://loja.exemplo.com/ofertas"
+
+# Configurações de rastreamento otimizadas para e-commerce
+crawl_settings:
+  depth: 3                  # Categoria → Subcategoria → Produto
+  follow_links: true
+  allowed_domains:
+    - "loja.exemplo.com"    # Restringir ao domínio da loja
+  render_js: false
+  delay_min: 2.0            # Mais respeitoso que spider genérico
+  delay_max: 5.0
+  rate_limit: 1             # 1 req/seg — evita bloqueios
+  timeout: 45               # Lojas podem ser lentas
+  retry_times: 3
+  user_agent: "auto"
+
+# Seletores de extração para e-commerce
+extraction:
+  item_selector: ".produto, .product, article.item, [data-product-id]"
+
+  fields:
+    # Nome do produto
+    nome:
+      selector: "h1.produto-nome, h1.product-title, .product-name, [itemprop='name']"
+      type: "text"
+      required: true
+      strip: true
+
+    # Preço atual
+    preco:
+      selector: ".preco-atual, .price-current, .price, [itemprop='price'], .offer-price"
+      attr: "content"       # Tenta microdata primeiro
+      fallback_selector: ".preco-atual, .price"  # Fallback para texto
+      type: "text"
+      transform: "to_float"
+      required: true
+
+    # Preço antigo (antes do desconto)
+    preco_antigo:
+      selector: ".preco-antigo, .price-old, .was-price, s.price, del"
+      type: "text"
+      transform: "to_float"
+      required: false
+
+    # Percentual de desconto
+    desconto:
+      selector: ".desconto, .discount, .badge-discount, [class*='descont']"
+      type: "text"
+      transform: "to_float"  # Converte "30%" → 30.0
+      required: false
+
+    # Disponibilidade em estoque
+    disponibilidade:
+      selector: "[itemprop='availability'], .estoque, .stock-status, .availability"
+      attr: "content"
+      fallback_selector: ".estoque, .stock"
+      type: "text"
+      transform: "to_bool"   # "Em estoque" → true
+      required: false
+
+    # SKU / Código do produto
+    sku:
+      selector: "[itemprop='sku'], .sku, .product-code, [data-sku]"
+      attr: "content"
+      fallback_attr: "data-sku"
+      type: "text"
+      required: false
+
+    # Categoria do produto
+    categoria:
+      selector: ".breadcrumb li:last-child, .categoria, [itemprop='category']"
+      type: "text"
+      required: false
+
+    # Lista de imagens do produto
+    imagens:
+      selector: ".galeria img, .product-gallery img, [data-gallery] img"
+      attr: "src"
+      type: "url"
+      multiple: true         # Coletar todas as imagens
+      required: false
+
+    # URL do produto
+    url:
+      selector: "link[rel='canonical'], a.produto-link"
+      attr: "href"
+      type: "url"
+      required: false
+
+    # Avaliação média (estrelas)
+    avaliacao:
+      selector: "[itemprop='ratingValue'], .rating-value, .stars-value"
+      attr: "content"
+      type: "text"
+      transform: "to_float"
+      required: false
+
+    # Quantidade de avaliações
+    total_avaliacoes:
+      selector: "[itemprop='reviewCount'], .review-count, .avaliacoes-count"
+      attr: "content"
+      type: "text"
+      transform: "to_int"
+      required: false
+
+    # Vendedor/Marketplace
+    vendedor:
+      selector: ".vendedor, .seller-name, [data-seller], .by-seller"
+      type: "text"
+      required: false
+
+    # Especificações técnicas (como dict)
+    especificacoes:
+      selector: ".specs-table tr, .especificacoes tr, table.product-specs tr"
+      type: "table_rows"     # Extrai pares chave-valor de tabela
+      required: false
+
+# Seguir links de produtos nas páginas de categoria
+link_follow:
+  enabled: true
+  selectors:
+    - "a.produto-link[href]"
+    - "a.product-card[href]"
+    - ".product-name a[href]"
+
+# Paginação nas páginas de categoria
+pagination:
+  enabled: true
+  selector: "a.proxima, a.next, [rel='next'], .paginacao .proximo"
+  max_pages: 50             # Lojas podem ter muitas páginas
+
+# Saída
+output:
+  save_raw_html: false
+  deduplicate: true
+  dedup_field: "sku"        # Deduplicar por SKU quando disponível
+  format: "json"
+
+# Metadados adicionais
+metadata:
+  include_scraped_at: true  # Timestamp da coleta
+  include_source_url: true  # URL de onde foi coletado
+  include_spider_name: true

@@ -1,0 +1,44 @@
+# ── Celery e broker ─────────────────────────────────────────────────────────
+celery==5.3.6
+redis==5.0.7
+kombu==5.3.4
+
+# ── Scrapy e extensões ───────────────────────────────────────────────────────
+scrapy==2.11.0
+scrapy-playwright==0.0.40
+playwright==1.44.0
+
+# ── HTTP client assíncrono (validação de proxies) ────────────────────────────
+httpx==0.27.0
+
+# ── Banco de dados ───────────────────────────────────────────────────────────
+sqlalchemy==2.0.30
+asyncpg==0.29.0
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# ── Agendamento dinâmico ─────────────────────────────────────────────────────
+croniter==2.0.5
+
+# ── Configuração e serialização ──────────────────────────────────────────────
+pyyaml==6.0.1
+python-dotenv==1.0.1
+
+# ── Scraping utilitários ─────────────────────────────────────────────────────
+fake-useragent==1.5.1
+trafilatura==1.12.1
+cloudscraper==1.2.71
+lxml==5.2.2
+parsel==1.9.1
+feedparser==6.0.11
+jsonpath-ng==1.6.1
+
+# ── Datas e utilities ────────────────────────────────────────────────────────
+python-dateutil==2.9.0
+
+# ── Monitoramento ────────────────────────────────────────────────────────────
+prometheus-client==0.20.0
+flower==2.0.1
+
+# ── Logging estruturado ──────────────────────────────────────────────────────
+python-json-logger==2.0.7

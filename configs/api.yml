@@ -1,0 +1,161 @@
+# ============================================================
+# Configuração para Scraping de APIs REST/JSON
+# Ideal para coletar dados de APIs públicas ou semipúblicas
+# Suporta autenticação Bearer, API Key, Basic e OAuth2
+# ============================================================
+
+spider_type: api
+name: "api-rest"
+description: "Spider para APIs REST — coleta dados JSON estruturados"
+
+# URL base da API
+# Todos os endpoints serão relativos a esta URL
+base_url: "https://api.exemplo.com/v1"
+
+# Configurações de autenticação
+api_settings:
+  auth_type: "bearer"       # none | bearer | api_key | basic | oauth2
+
+  # Para auth_type: "bearer"
+  # O token é lido da variável de ambiente SPIDER_API_TOKEN
+  bearer_token: "${SPIDER_API_TOKEN}"
+
+  # Para auth_type: "api_key"
+  # api_key: "${SPIDER_API_KEY}"
+  # api_key_header: "X-API-Key"    # Nome do header
+  # api_key_param: null             # Ou parâmetro na URL
+
+  # Para auth_type: "basic"
+  # username: "${SPIDER_API_USER}"
+  # password: "${SPIDER_API_PASS}"
+
+  # Para auth_type: "oauth2"
+  # client_id: "${SPIDER_CLIENT_ID}"
+  # client_secret: "${SPIDER_CLIENT_SECRET}"
+  # token_url: "https://auth.exemplo.com/oauth/token"
+  # scopes: ["read:items", "read:users"]
+
+# Headers adicionais enviados em todas as requisições
+headers:
+  Accept: "application/json"
+  Content-Type: "application/json"
+  Accept-Language: "pt-BR"
+  # X-Custom-Header: "valor"
+
+# Endpoints a coletar
+endpoints:
+  - name: "listar_itens"
+    path: "/items"
+    method: "GET"
+    params:
+      page: 1
+      limit: 100
+      sort: "created_at"
+      order: "desc"
+    # Chave JSON onde estão os itens na resposta
+    data_key: "data"         # response["data"] = lista de itens
+    # Chave para total de itens (para calcular páginas)
+    total_key: "meta.total"
+
+  - name: "detalhes_item"
+    path: "/items/{id}"      # {id} será substituído pelo ID coletado
+    method: "GET"
+    # Desabilitado por padrão — habilitado quando follow_detail=true
+    enabled: false
+    data_key: null            # Resposta inteira é o item
+
+  - name: "listar_categorias"
+    path: "/categories"
+    method: "GET"
+    params:
+      per_page: 50
+    data_key: "categories"
+    enabled: true
+
+# Configurações de paginação
+pagination:
+  type: "page"              # page | cursor | offset | link
+
+  # Para type: "page"
+  page_param: "page"
+  limit_param: "limit"
+  items_per_page: 100
+  max_pages: 50             # Limite de segurança
+
+  # Para type: "cursor"
+  # cursor_param: "cursor"
+  # next_cursor_path: "meta.next_cursor"  # JSONPath para próximo cursor
+
+  # Para type: "offset"
+  # offset_param: "offset"
+  # next_offset_path: "meta.next_offset"
+
+  # Para type: "link"
+  # next_link_path: "links.next"    # JSONPath para URL da próxima página
+
+# Mapeamento de campos via JSONPath
+# Sintaxe: "$.caminho.para.campo"
+jsonpath_fields:
+  # Campos básicos
+  id:          "$.id"
+  titulo:      "$.name"
+  descricao:   "$.description"
+  preco:       "$.price"
+  categoria:   "$.category.name"
+  ativo:       "$.is_active"
+  criado_em:   "$.created_at"
+  atualizado_em: "$.updated_at"
+
+  # Campos aninhados
+  autor_nome:  "$.author.name"
+  autor_email: "$.author.email"
+
+  # Arrays — pega primeiro elemento
+  tag_principal: "$.tags[0]"
+
+  # Todos elementos de array
+  todas_tags:  "$.tags[*]"
+
+# Transformações nos campos
+field_transforms:
+  preco: "to_float"
+  ativo: "to_bool"
+  criado_em: "to_date"
+  atualizado_em: "to_date"
+
+# Configurações de requisição
+request_settings:
+  timeout: 30               # segundos
+  retry_times: 3
+  retry_on_status: [429, 500, 502, 503, 504]
+  delay_min: 0.5            # APIs geralmente toleram mais velocidade
+  delay_max: 2.0
+  rate_limit: 5             # req/seg — respeitar rate limit da API
+
+  # Respeitar header Retry-After em respostas 429
+  respect_retry_after: true
+
+# Tratamento de erros da API
+error_handling:
+  # Campos para identificar erro na resposta JSON
+  error_field: "error"       # Se presente na resposta, é um erro
+  message_field: "message"
+
+  # Parar se receber HTTP 401 (credenciais inválidas)
+  stop_on_401: true
+
+  # Continuar em erros 404 (item não encontrado)
+  skip_on_404: true
+
+# Saída
+output:
+  save_raw_response: false   # Salvar JSON bruto da API
+  deduplicate: true
+  dedup_field: "id"
+  format: "json"
+
+# Metadados
+metadata:
+  include_scraped_at: true
+  include_endpoint: true     # Registrar de qual endpoint veio o dado
+  include_spider_name: true
