@@ -1,0 +1,119 @@
+{
+  "name": "🕷️ WebScraper Pro — Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+
+  // Serviços Docker disponíveis no Codespace via Docker-in-Docker
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "true"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+
+  // Portas expostas pelo Codespace
+  "forwardPorts": [
+    8000,
+    3000,
+    5555,
+    5432,
+    6379,
+    9090,
+    3100,
+    5050
+  ],
+
+  // Labels para as portas (visíveis na aba PORTS do VS Code)
+  "portsAttributes": {
+    "8000": {
+      "label": "🚀 FastAPI (Swagger em /docs)",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "🎨 Frontend Dashboard",
+      "onAutoForward": "openBrowser"
+    },
+    "5555": {
+      "label": "🌸 Flower (Celery Monitor)",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "🐘 PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "🔴 Redis",
+      "onAutoForward": "silent"
+    },
+    "9090": {
+      "label": "📊 Prometheus",
+      "onAutoForward": "silent"
+    },
+    "5050": {
+      "label": "🔧 PgAdmin",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Extensões VS Code instaladas automaticamente no Codespace
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dsznajder.es7-react-js-snippets",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "mikestead.dotenv",
+        "yzhang.markdown-all-in-one",
+        "christian-kohler.path-intellisense",
+        "PKief.material-icon-theme",
+        "zhuangtongfa.material-theme",
+        "ms-vscode.vscode-typescript-next",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "workbench.colorTheme": "One Dark Pro",
+        "workbench.iconTheme": "material-icon-theme",
+        "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+        "editor.fontSize": 14,
+        "editor.lineHeight": 1.6,
+        "editor.tabSize": 4,
+        "editor.bracketPairColorization.enabled": true,
+        "tailwindCSS.experimental.classRegex": [
+          ["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
+        ]
+      }
+    }
+  },
+
+  // Script executado após criar o container
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Usuário padrão (não-root)
+  "remoteUser": "vscode",
+
+  // Variáveis de ambiente no container
+  "remoteEnv": {
+    "PYTHONPATH": "${containerWorkspaceFolder}",
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  }
+}
