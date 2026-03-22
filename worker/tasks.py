@@ -217,6 +217,29 @@ def scrape_url(
             crawl_depth=crawl_depth,
         )
 
+        async def _contar_itens_persistidos() -> int:
+            from sqlalchemy import func, select
+            from database.models import ScrapedItem
+
+            factory, engine = await _get_db_session()
+            try:
+                async with factory() as session:
+                    stmt = select(func.count(ScrapedItem.id)).where(ScrapedItem.job_id == job_id)
+                    result = await session.execute(stmt)
+                    return int(result.scalar() or 0)
+            finally:
+                await engine.dispose()
+
+        persisted_items_count = _run_async(_contar_itens_persistidos())
+        if persisted_items_count != items_count:
+            logger.info(
+                "[scrape_url] Ajustando items_count pelo banco: runner=%d persisted=%d job_id=%d",
+                items_count,
+                persisted_items_count,
+                job_id,
+            )
+        items_count = persisted_items_count
+
         fim = datetime.now(timezone.utc)
         duracao = (fim - inicio).total_seconds()
 
