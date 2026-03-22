@@ -180,6 +180,17 @@ class StoragePipeline:
             sort_keys=True,
         )
 
+        scraped_at = item.get("scraped_at")
+        if isinstance(scraped_at, datetime):
+            scraped_at_value = scraped_at
+        elif isinstance(scraped_at, str) and scraped_at:
+            try:
+                scraped_at_value = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
+            except ValueError:
+                scraped_at_value = datetime.now(timezone.utc)
+        else:
+            scraped_at_value = datetime.now(timezone.utc)
+
         return {
             "job_id": item.get("job_id"),
             "url": str(item.get("url") or ""),
@@ -187,9 +198,8 @@ class StoragePipeline:
             "content": str(item.get("content") or ""),
             "raw_data": raw_payload,
             "domain": str(item.get("domain") or ""),
-            "spider_name": str(item.get("spider_name") or ""),
             "content_hash": hashlib.sha256(hash_payload.encode("utf-8")).hexdigest(),
-            "scraped_at": item.get("scraped_at") or datetime.now(timezone.utc).isoformat(),
+            "scraped_at": scraped_at_value,
             "metadata": item.get("metadata") or {},
         }
 
