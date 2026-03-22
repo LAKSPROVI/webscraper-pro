@@ -3,6 +3,22 @@ import { devtools } from 'zustand/middleware'
 
 export type JobStatus = 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELLED'
 
+export interface OperatorAction {
+  required?: boolean
+  type?: string
+  message?: string
+  open_url?: string
+  next_step_command?: string
+}
+
+export interface JobMetadata {
+  operator_action?: OperatorAction
+  challenge_detected?: boolean
+  challenge_source?: string
+  challenge_detected_at?: string
+  [key: string]: unknown
+}
+
 export interface Job {
   id: string
   url: string
@@ -17,6 +33,7 @@ export interface Job {
   render_js: boolean
   crawl_depth: number
   progress?: number
+  metadata?: JobMetadata
 }
 
 export interface ScrapedItem {

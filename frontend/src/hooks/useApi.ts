@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import type { Job, ScrapedItem } from '../stores/appStore'
+import type { Job, JobStatus, ScrapedItem } from '../stores/appStore'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
@@ -66,6 +66,70 @@ export interface PaginatedResponse<T> {
   page: number
   limit: number
   pages: number
+}
+
+interface BackendJob {
+  id: string | number
+  url: string
+  config_name?: string | null
+  status: string
+  spider_type?: string | null
+  render_js?: boolean
+  crawl_depth?: number
+  items_scraped?: number
+  error_msg?: string | null
+  metadata?: Record<string, unknown> | null
+  metadata_?: Record<string, unknown> | null
+  created_at: string
+  started_at?: string | null
+  completed_at?: string | null
+  duracao_segundos?: number | null
+}
+
+interface BackendJobListResponse {
+  items: BackendJob[]
+  total: number
+  page: number
+  limit: number
+  pages?: number
+}
+
+interface BackendJobCreatedResponse {
+  job_id: number | string
+  status: string
+  created_at: string
+}
+
+const STATUS_MAP: Record<string, JobStatus> = {
+  pending: 'PENDING',
+  running: 'RUNNING',
+  done: 'DONE',
+  failed: 'FAILED',
+  cancelled: 'CANCELLED',
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  DONE: 'DONE',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+}
+
+function normalizeJob(job: BackendJob): Job {
+  const status = STATUS_MAP[job.status] || 'PENDING'
+  return {
+    id: String(job.id),
+    url: job.url,
+    spider_type: String(job.spider_type || 'generic'),
+    status,
+    items_count: Number(job.items_scraped ?? 0),
+    created_at: job.created_at,
+    started_at: job.started_at || undefined,
+    finished_at: job.completed_at || undefined,
+    duration_seconds: job.duracao_segundos ?? undefined,
+    error_message: job.error_msg || undefined,
+    render_js: Boolean(job.render_js),
+    crawl_depth: Number(job.crawl_depth ?? 1),
+    metadata: (job.metadata || job.metadata_) ?? undefined,
+  }
 }
 
 export interface DataSearchParams {
@@ -159,8 +223,18 @@ export function useJobs(params: JobsListParams = {}) {
   return useQuery<PaginatedResponse<Job>>({
     queryKey: ['jobs', params],
     queryFn: async () => {
-      const { data } = await api.get<PaginatedResponse<Job>>('/api/v1/jobs', { params })
-      return data
+      const backendParams = {
+        ...params,
+        status: params.status?.toLowerCase(),
+      }
+      const { data } = await api.get<BackendJobListResponse>('/api/v1/jobs', { params: backendParams })
+      return {
+        items: (data.items || []).map(normalizeJob),
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+        pages: data.pages || Math.max(1, Math.ceil(data.total / Math.max(1, data.limit))),
+      }
     },
     refetchInterval: 5000,
   })
@@ -170,8 +244,8 @@ export function useJob(id: string) {
   return useQuery<Job>({
     queryKey: ['job', id],
     queryFn: async () => {
-      const { data } = await api.get<Job>(`/api/v1/jobs/${id}`)
-      return data
+      const { data } = await api.get<BackendJob>(`/api/v1/jobs/${id}`)
+      return normalizeJob(data)
     },
     enabled: !!id,
   })
@@ -195,11 +269,12 @@ export function useScrape() {
 
   return useMutation({
     mutationFn: async (request: ScrapeRequest) => {
-      const { data } = await api.post<Job>('/api/v1/scrape', request)
+      const { data } = await api.post<BackendJobCreatedResponse>('/api/v1/scrape', request)
       return data
     },
     onSuccess: (data) => {
-      toast.success(`Job iniciado: ${data.id.slice(0, 8)}...`)
+      const jobId = String(data.job_id)
+      toast.success(`Job iniciado: ${jobId.slice(0, 8)}...`)
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
     },

@@ -2,13 +2,12 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Filter, RefreshCw, Eye, XCircle, RotateCcw,
-  Copy, Check, Globe, ChevronLeft, ChevronRight,
+  Copy, Check, Globe, ChevronLeft, ChevronRight, AlertTriangle, ExternalLink,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import clsx from 'clsx'
 import { useJobs, useCancelJob, useRetryJob } from '../hooks/useApi'
-import { useAppStore } from '../stores/appStore'
 import type { Job, JobStatus } from '../stores/appStore'
 import StatusBadge from '../components/ui/StatusBadge'
 import ProgressBar from '../components/ui/ProgressBar'
@@ -58,6 +57,71 @@ function CopyableId({ id }: { id: string }) {
         )}
       </span>
     </button>
+  )
+}
+
+function OperatorActionAlert({ job }: { job: Job }) {
+  const action = job.metadata?.operator_action
+  if (!action?.required) {
+    return null
+  }
+
+  const message = action.message || 'Intervenção do operador requerida para renovar sessão autenticada.'
+
+  const handleOpenLogin = () => {
+    if (!action.open_url) {
+      toast.error('URL de login não disponível para este alerta')
+      return
+    }
+    window.open(action.open_url, '_blank', 'noopener,noreferrer')
+    toast.success('Página de login aberta em nova aba')
+  }
+
+  const handleCopyCommand = async () => {
+    if (!action.next_step_command) {
+      toast.error('Comando de ação não disponível')
+      return
+    }
+    await navigator.clipboard.writeText(action.next_step_command)
+    toast.success('Comando copiado para a área de transferência')
+  }
+
+  return (
+    <GlowCard color="amber" className="p-4 border border-neon-amber-dim bg-neon-amber-dim/20">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-lg p-2 bg-neon-amber-dim border border-neon-amber-dim">
+            <AlertTriangle size={16} className="text-neon-amber" />
+          </div>
+          <div>
+            <p className="text-neon-amber text-sm font-semibold">Ação do operador necessária</p>
+            <p className="text-text-secondary text-sm mt-1">{message}</p>
+            <p className="text-text-muted text-xs font-mono mt-2">
+              Job {job.id} • {job.url}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <NeonButton
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenLogin}
+            icon={<ExternalLink size={13} />}
+          >
+            Abrir login
+          </NeonButton>
+          <NeonButton
+            variant="secondary"
+            size="sm"
+            onClick={handleCopyCommand}
+            icon={<Copy size={13} />}
+          >
+            Copiar comando
+          </NeonButton>
+        </div>
+      </div>
+    </GlowCard>
   )
 }
 
@@ -247,9 +311,12 @@ export default function Jobs() {
   const displayJobs = data?.items || mockJobs
   const totalPages = data?.pages || 3
   const total = data?.total || 47
+  const operatorActionJob = displayJobs.find((job) => Boolean(job.metadata?.operator_action?.required))
 
   return (
     <div className="space-y-4 animate-fade-in">
+      {operatorActionJob && <OperatorActionAlert job={operatorActionJob} />}
+
       {/* Filtros */}
       <GlowCard color="cyan" className="p-4">
         <div className="flex flex-col sm:flex-row gap-3">
