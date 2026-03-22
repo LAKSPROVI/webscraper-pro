@@ -20,7 +20,7 @@ from typing import Any, Annotated, Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
@@ -330,6 +330,70 @@ async def listar_items_do_job(
         page=page,
         limit=limit,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/jobs/{job_id}/operator-action/resolve — Marcar ação resolvida
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/jobs/{job_id}/operator-action/resolve",
+    response_model=JobResponse,
+    summary="Marcar ação operacional como resolvida",
+    description="Marca o alerta operacional do job como resolvido no metadata.operator_action.",
+    responses={
+        200: {"description": "Ação marcada como resolvida"},
+        404: {"description": "Job não encontrado"},
+        409: {"description": "Job não possui ação operacional pendente"},
+    },
+)
+@limiter.limit("60/minute")
+async def resolver_acao_operacional(
+    request: Request,
+    job_id: int,
+    db: Annotated[Any, Depends(get_db)],
+) -> JobResponse:
+    """Marca ação operacional pendente como resolvida."""
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job com ID {job_id} não foi encontrado.",
+        )
+
+    metadata = dict(job.metadata_ or {})
+    operator_action = dict(metadata.get("operator_action") or {})
+
+    if not operator_action.get("required"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Job não possui ação operacional pendente para resolver.",
+        )
+
+    operator_action["required"] = False
+    operator_action["resolved"] = True
+    operator_action["resolved_at"] = datetime.now(tz=timezone.utc).isoformat()
+    operator_action.setdefault("resolved_by", "operator")
+    metadata["operator_action"] = operator_action
+    metadata["challenge_detected"] = False
+
+    await db.execute(
+        sa_update(ScrapingJob)
+        .where(ScrapingJob.id == job_id)
+        .values(metadata_=metadata)
+    )
+    await db.commit()
+
+    job_updated = await get_job(db, job_id)
+    if job_updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job com ID {job_id} não foi encontrado após atualização.",
+        )
+
+    logger.info("Ação operacional marcada como resolvida: job_id=%d", job_id)
+    return JobResponse.model_validate(job_updated)
 
 
 # ---------------------------------------------------------------------------

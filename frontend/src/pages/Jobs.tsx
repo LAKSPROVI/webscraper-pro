@@ -7,7 +7,7 @@ import {
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import clsx from 'clsx'
-import { useJobs, useCancelJob, useRetryJob } from '../hooks/useApi'
+import { useJobs, useCancelJob, useRetryJob, useResolveOperatorAction } from '../hooks/useApi'
 import type { Job, JobStatus } from '../stores/appStore'
 import StatusBadge from '../components/ui/StatusBadge'
 import ProgressBar from '../components/ui/ProgressBar'
@@ -60,7 +60,7 @@ function CopyableId({ id }: { id: string }) {
   )
 }
 
-function OperatorActionAlert({ job }: { job: Job }) {
+function OperatorActionAlert({ job, onFocusJob }: { job: Job; onFocusJob: (job: Job) => void }) {
   const action = job.metadata?.operator_action
   if (!action?.required) {
     return null
@@ -106,6 +106,14 @@ function OperatorActionAlert({ job }: { job: Job }) {
           <NeonButton
             variant="ghost"
             size="sm"
+            onClick={() => onFocusJob(job)}
+            icon={<Eye size={13} />}
+          >
+            Ir para job
+          </NeonButton>
+          <NeonButton
+            variant="ghost"
+            size="sm"
             onClick={handleOpenLogin}
             icon={<ExternalLink size={13} />}
           >
@@ -128,9 +136,12 @@ function OperatorActionAlert({ job }: { job: Job }) {
 function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => void }) {
   const { mutate: cancel, isPending: cancelling } = useCancelJob()
   const { mutate: retry, isPending: retrying } = useRetryJob()
+  const { mutate: resolveOperatorAction, isPending: resolving } = useResolveOperatorAction()
 
   const isRunning = job.status === 'RUNNING'
-  const hasOperatorAction = Boolean(job.metadata?.operator_action?.required)
+  const hasOperatorAction = Boolean(job.metadata?.operator_action)
+  const hasPendingOperatorAction = Boolean(job.metadata?.operator_action?.required)
+  const operatorActionResolved = Boolean(job.metadata?.operator_action?.resolved)
   const domain = (() => {
     try { return new URL(job.url).hostname } catch { return job.url }
   })()
@@ -184,7 +195,7 @@ function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => voi
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <StatusBadge status={job.status} size="sm" />
-            {hasOperatorAction && (
+            {hasPendingOperatorAction && (
               <span
                 className="inline-flex items-center justify-center rounded-full border border-neon-amber-dim bg-neon-amber-dim p-1"
                 title="Ação manual do operador pendente para este job"
@@ -194,6 +205,18 @@ function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => voi
               </span>
             )}
           </div>
+          {hasOperatorAction && (
+            <span className={clsx(
+              'inline-flex w-fit rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide',
+              hasPendingOperatorAction
+                ? 'border-neon-amber-dim bg-neon-amber-dim text-neon-amber'
+                : operatorActionResolved
+                  ? 'border-neon-green-dim bg-neon-green-dim text-neon-green'
+                  : 'border-border-mid bg-bg-surface text-text-muted'
+            )}>
+              {hasPendingOperatorAction ? 'ação aberta' : operatorActionResolved ? 'ação resolvida' : 'ação'}
+            </span>
+          )}
           {isRunning && job.progress !== undefined && (
             <ProgressBar value={job.progress} size="xs" color="cyan" className="w-20" />
           )}
@@ -247,6 +270,16 @@ function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => voi
               title="Re-executar"
             >
               <RotateCcw size={13} />
+            </button>
+          )}
+          {hasPendingOperatorAction && (
+            <button
+              onClick={() => resolveOperatorAction(job.id)}
+              disabled={resolving}
+              className="p-1.5 rounded-lg hover:bg-neon-green-dim hover:text-neon-green text-text-muted transition-all duration-150"
+              title="Marcar ação como resolvida"
+            >
+              <Check size={13} />
             </button>
           )}
         </div>
@@ -339,9 +372,15 @@ export default function Jobs() {
   const total = data?.total || 47
   const operatorActionJob = displayJobs.find((job) => Boolean(job.metadata?.operator_action?.required))
 
+  const focusJob = (job: Job) => {
+    setSearch(job.id)
+    setPage(1)
+    setSelectedJob(job)
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
-      {operatorActionJob && <OperatorActionAlert job={operatorActionJob} />}
+      {operatorActionJob && <OperatorActionAlert job={operatorActionJob} onFocusJob={focusJob} />}
 
       {/* Filtros */}
       <GlowCard color="cyan" className="p-4">

@@ -9,6 +9,9 @@ export interface OperatorAction {
   message?: string
   open_url?: string
   next_step_command?: string
+  resolved?: boolean
+  resolved_at?: string
+  resolved_by?: string
 }
 
 export interface JobMetadata {

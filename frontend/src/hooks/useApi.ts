@@ -314,6 +314,25 @@ export function useRetryJob() {
   })
 }
 
+export function useResolveOperatorAction() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data } = await api.post<BackendJob>(`/api/v1/jobs/${jobId}/operator-action/resolve`)
+      return normalizeJob(data)
+    },
+    onSuccess: (job) => {
+      toast.success(`Ação operacional resolvida no job ${job.id}`)
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['job', job.id] })
+    },
+    onError: () => {
+      toast.error('Falha ao marcar ação como resolvida')
+    },
+  })
+}
+
 // ============================================================
 // DATA EXPLORER
 // ============================================================
