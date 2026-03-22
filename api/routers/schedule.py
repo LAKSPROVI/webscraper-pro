@@ -23,7 +23,7 @@ from database.queries import (
     create_scheduled_job,
     get_spider_config,
 )
-from models.schemas import (
+from api.models.schemas import (
     CreateScheduledJob,
     PaginatedResponse,
     ScheduledJobResponse,

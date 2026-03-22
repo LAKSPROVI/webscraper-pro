@@ -20,9 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from database.queries import create_job
-from models.celery_app import send_scrape_task, send_bulk_scrape_task
+from api.models.celery_app import send_scrape_task, send_bulk_scrape_task
 from api.rate_limiter import limiter
-from models.schemas import (
+from api.models.schemas import (
     BulkJobCreatedResponse,
     BulkScrapeRequest,
     JobCreatedResponse,

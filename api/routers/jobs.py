@@ -31,8 +31,8 @@ from database.queries import (
     list_jobs,
     update_job_status,
 )
-from models.celery_app import revoke_task
-from models.schemas import (
+from api.models.celery_app import revoke_task
+from api.models.schemas import (
     ItemResponse,
     JobResponse,
     PaginatedResponse,

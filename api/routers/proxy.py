@@ -6,7 +6,7 @@ from typing import Any
 import redis
 from fastapi import APIRouter, HTTPException, status
 
-from models.celery_app import send_proxy_health_check_task, send_update_proxy_pool_task
+from api.models.celery_app import send_proxy_health_check_task, send_update_proxy_pool_task
 
 router = APIRouter(prefix="/api/v1/proxy", tags=["Proxy"])
 

@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from database.models import ScrapedItem, ScrapingJob
-from models.schemas import (
+from api.models.schemas import (
     DomainStats,
     ItemResponse,
     SearchResponse,

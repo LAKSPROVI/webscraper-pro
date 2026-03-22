@@ -27,7 +27,7 @@ from database.queries import (
     get_spider_config,
     list_spider_configs,
 )
-from models.schemas import (
+from api.models.schemas import (
     CreateSpiderConfig,
     PaginatedResponse,
     SpiderConfigResponse,
