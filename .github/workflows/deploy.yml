@@ -1,0 +1,97 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+      APP_PATH: /opt/webscraper-pro/app
+      FRONT_DIST_PATH: /opt/webscraper-pro/frontend
+      API_HEALTH_URL: ${{ secrets.DEPLOY_API_HEALTH_URL }}
+
+    steps:
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "Missing required secret: $var"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Install SSH tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
+
+      - name: Deploy services on server
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          sshpass -p "$DEPLOY_PASSWORD" ssh \
+            -o PubkeyAuthentication=no \
+            -o PreferredAuthentications=password \
+            -o StrictHostKeyChecking=no \
+            -p "$PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'SH'
+          set -euo pipefail
+
+          sudo -u webscraper -H bash -lc '
+            set -e
+            cd /opt/webscraper-pro/app
+            BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+            git pull --ff-only origin "$BRANCH"
+          '
+
+          systemctl restart webscraper-api webscraper-worker webscraper-scheduler
+
+          sudo -u webscraper -H bash -lc '
+            set -e
+            cd /opt/webscraper-pro/app/frontend
+            npm ci --no-audit --no-fund
+            npm run build
+          '
+
+          rsync -a --delete /opt/webscraper-pro/app/frontend/dist/ /opt/webscraper-pro/frontend/
+
+          nginx -t
+          systemctl reload nginx
+          systemctl is-active webscraper-api webscraper-worker webscraper-scheduler nginx
+          SH
+
+      - name: Smoke test API
+        if: ${{ env.API_HEALTH_URL != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "$API_HEALTH_URL" | head -c 500

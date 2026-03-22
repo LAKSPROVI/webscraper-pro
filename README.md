@@ -679,6 +679,27 @@ Pipeline configurado em [.github/workflows/ci.yml](.github/workflows/ci.yml):
   - Type-check (`tsc --noEmit`)
   - Build de produção (`vite build`)
 
+Deploy automático de produção em [.github/workflows/deploy.yml](.github/workflows/deploy.yml):
+
+- Dispara automaticamente após `CI` bem-sucedida em `master/main`
+- Também pode ser executado manualmente via `workflow_dispatch`
+- No servidor, executa:
+  - `git pull --ff-only`
+  - restart de `webscraper-api`, `webscraper-worker`, `webscraper-scheduler`
+  - build do frontend + sync de `dist`
+  - `nginx -t` + `reload`
+  - smoke test opcional da API
+
+Secrets necessários no GitHub (Settings -> Secrets and variables -> Actions):
+
+- `DEPLOY_HOST`: IP/DNS do servidor
+- `DEPLOY_PORT`: porta SSH (opcional, default 22)
+- `DEPLOY_USER`: usuário SSH com privilégios de deploy
+- `DEPLOY_PASSWORD`: senha SSH desse usuário
+- `DEPLOY_API_HEALTH_URL`: URL de health check pública (opcional)
+
+Com esses secrets configurados, o deploy deixa de depender de execução manual via Codespace.
+
 ---
 
 ## 🧰 Operação
