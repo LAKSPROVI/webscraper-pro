@@ -16,7 +16,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices, computed_field, field_validator
 
 # Tipo genérico para paginação
 T = TypeVar("T")
@@ -335,7 +335,8 @@ class JobResponse(BaseModel):
     error_msg: Optional[str] = Field(default=None, description="Mensagem de erro (se houver)")
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
-        alias="metadata_",
+        validation_alias=AliasChoices("metadata_", "metadata"),
+        serialization_alias="metadata",
         description="Metadados do job, incluindo alertas operacionais",
     )
     created_at: datetime = Field(..., description="Data/hora de criação")
