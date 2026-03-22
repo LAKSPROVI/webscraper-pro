@@ -102,6 +102,12 @@ class DuplicateFilterPipeline:
         """
         self._total_processed += 1
 
+        # Mantém itens de diagnóstico de bloqueio para análise por job.
+        metadata = item.get("metadata") or {}
+        status_code = metadata.get("status_code") if isinstance(metadata, dict) else None
+        if status_code in (403, 429):
+            return item
+
         # Calcula fingerprint SHA-256 do item
         content_hash = self._calculate_hash(item)
 
