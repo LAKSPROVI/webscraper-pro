@@ -16,6 +16,7 @@ compatível com o ambiente síncrono do Scrapy sem monkey-patching.
 
 import asyncio
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -116,7 +117,7 @@ class StoragePipeline:
         # Atualiza estatísticas do job no banco
         if self._current_job_id and DB_AVAILABLE:
             try:
-                asyncio.run(self._update_job_stats(self._current_job_id))
+                self._run_coro_sync(self._update_job_stats(self._current_job_id))
             except Exception as e:
                 logger.error(f"Erro ao atualizar estatísticas do job {self._current_job_id}: {e}")
 
@@ -186,7 +187,7 @@ class StoragePipeline:
         self._buffer.clear()
 
         try:
-            inserted = asyncio.run(self._insert_batch(items_to_insert))
+            inserted = self._run_coro_sync(self._insert_batch(items_to_insert))
             self._saved_count += inserted
             logger.info(f"Batch inserido: {inserted} itens (total: {self._saved_count})")
         except Exception as e:
@@ -241,7 +242,7 @@ class StoragePipeline:
         saved = 0
         for item_dict in items:
             try:
-                asyncio.run(self._insert_batch([item_dict]))
+                self._run_coro_sync(self._insert_batch([item_dict]))
                 saved += 1
                 self._saved_count += 1
             except Exception as e:
@@ -251,6 +252,38 @@ class StoragePipeline:
                 )
         if saved:
             logger.info(f"Fallback one-by-one: {saved}/{len(items)} itens salvos")
+
+    def _run_coro_sync(self, coro):
+        """
+        Executa coroutine de forma segura em contexto Scrapy/Twisted.
+
+        Se já houver loop rodando na thread atual, executa a coroutine em
+        uma thread auxiliar com loop próprio e bloqueia até retorno.
+        """
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop and running_loop.is_running():
+            result_holder = {"result": None, "error": None}
+
+            def _runner() -> None:
+                try:
+                    result_holder["result"] = asyncio.run(coro)
+                except Exception as exc:
+                    result_holder["error"] = exc
+
+            t = threading.Thread(target=_runner, daemon=True)
+            t.start()
+            t.join()
+
+            if result_holder["error"] is not None:
+                raise result_holder["error"]
+
+            return result_holder["result"]
+
+        return asyncio.run(coro)
 
     async def _update_job_stats(self, job_id: int) -> None:
         """
