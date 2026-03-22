@@ -31,7 +31,10 @@ logger = logging.getLogger(__name__)
 # Configuração da conexão Redis
 # ---------------------------------------------------------------------------
 
-REDIS_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+REDIS_URL: str = os.getenv(
+    "REDIS_URL",
+    os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+)
 
 
 class EventPublisher:

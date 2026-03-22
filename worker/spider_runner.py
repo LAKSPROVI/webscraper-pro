@@ -16,9 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Any
 
 import redis
@@ -111,7 +109,7 @@ class SpiderRunner:
             crawl_depth,
         )
 
-        # Resultado compartilhado entre thread principal e thread do spider
+        # Resultado compartilhado da execução do spider
         resultado: dict[str, Any] = {
             "items_count": 0,
             "error": None,
@@ -119,33 +117,18 @@ class SpiderRunner:
             "stats": {},
         }
 
-        # Executa o spider em thread dedicada
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                self._executar_spider_em_thread,
-                job_id=job_id,
-                url=url,
-                spider_type=spider_type,
-                config=config,
-                render_js=render_js,
-                use_proxy=use_proxy,
-                crawl_depth=crawl_depth,
-                resultado=resultado,
-            )
-
-            try:
-                # Aguarda com timeout máximo
-                future.result(timeout=timeout)
-            except FutureTimeoutError:
-                logger.error(
-                    "Spider excedeu timeout de %ds: job_id=%d, url=%s",
-                    timeout,
-                    job_id,
-                    url,
-                )
-                raise TimeoutError(
-                    f"Spider excedeu o timeout máximo de {timeout}s para job_id={job_id}"
-                )
+        # Executa no thread principal do processo worker. O Scrapy/Twisted
+        # utiliza sinais de sistema e falha quando executado em thread secundária.
+        self._executar_spider_em_thread(
+            job_id=job_id,
+            url=url,
+            spider_type=spider_type,
+            config=config,
+            render_js=render_js,
+            use_proxy=use_proxy,
+            crawl_depth=crawl_depth,
+            resultado=resultado,
+        )
 
         # Verifica se houve erro durante a execução
         if resultado["error"] is not None:
