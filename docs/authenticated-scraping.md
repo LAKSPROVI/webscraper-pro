@@ -50,6 +50,20 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
 4. Depois do login (e MFA, se houver), volte ao terminal e pressione ENTER.
 5. O arquivo `sessions/jusbrasil.storage-state.json` sera criado para uso no deploy.
 
+Opcao sem interface grafica (headless, com login automatico):
+
+```bash
+export JUSBRASIL_EMAIL="seu_email"
+export JUSBRASIL_PASSWORD="sua_senha"
+
+.venv/bin/python scripts/export_jusbrasil_storage_state.py \
+  --output sessions/jusbrasil.storage-state.json \
+  --headless \
+  --auto-login
+```
+
+Observacao: se houver CAPTCHA, 2FA ou challenge adicional, o modo automatico pode nao concluir sozinho.
+
 ### Request via API
 
 Exemplo de request com spider dedicado:

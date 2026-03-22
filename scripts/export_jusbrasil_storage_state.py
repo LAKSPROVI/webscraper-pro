@@ -11,7 +11,9 @@ Fluxo:
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+from typing import Any
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -42,7 +44,87 @@ def parse_args() -> argparse.Namespace:
         default=180000,
         help="Timeout em milissegundos para espera de navegacao apos login",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Executa navegador sem interface grafica",
+    )
+    parser.add_argument(
+        "--auto-login",
+        action="store_true",
+        help="Tenta login automatico com JUSBRASIL_EMAIL e JUSBRASIL_PASSWORD",
+    )
     return parser.parse_args()
+
+
+def _try_auto_login(page: Any, timeout_ms: int) -> bool:
+    email = os.getenv("JUSBRASIL_EMAIL", "").strip()
+    password = os.getenv("JUSBRASIL_PASSWORD", "").strip()
+
+    if not email or not password:
+        print("Auto-login habilitado, mas variaveis JUSBRASIL_EMAIL/JUSBRASIL_PASSWORD estao vazias.")
+        return False
+
+    print("Tentando login automatico com variaveis de ambiente...")
+
+    # Seletores comuns para fluxo de login web.
+    email_selectors = [
+        'input[type="email"]',
+        'input[name="email"]',
+        'input[id*="email"]',
+        'input[autocomplete="username"]',
+    ]
+    password_selectors = [
+        'input[type="password"]',
+        'input[name="password"]',
+        'input[id*="senha"]',
+        'input[autocomplete="current-password"]',
+    ]
+    submit_selectors = [
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button:has-text("Entrar")',
+        'button:has-text("Login")',
+    ]
+
+    email_field = None
+    for sel in email_selectors:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            email_field = loc.first
+            break
+
+    password_field = None
+    for sel in password_selectors:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            password_field = loc.first
+            break
+
+    if email_field is None or password_field is None:
+        print("Nao foi possivel localizar campos de login automaticamente.")
+        return False
+
+    email_field.fill(email)
+    password_field.fill(password)
+
+    submitted = False
+    for sel in submit_selectors:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            loc.first.click()
+            submitted = True
+            break
+
+    if not submitted:
+        password_field.press("Enter")
+
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    except PlaywrightTimeoutError:
+        print("Timeout apos tentativa de submit. Prosseguindo para validacao de sessao.")
+
+    return True
 
 
 def main() -> int:
@@ -53,15 +135,21 @@ def main() -> int:
     print("Abrindo navegador para login manual no Jusbrasil...")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=args.headless)
         context = browser.new_context(locale="pt-BR")
         page = context.new_page()
 
         try:
             page.goto(args.start_url, wait_until="domcontentloaded")
-            print("\nFaca login manualmente no navegador aberto.")
-            print("Depois de concluir login e abrir uma pagina autenticada, volte ao terminal.")
-            input("Pressione ENTER para continuar e salvar a sessao... ")
+
+            auto_done = False
+            if args.auto_login:
+                auto_done = _try_auto_login(page, args.timeout)
+
+            if not auto_done:
+                print("\nFaca login manualmente no navegador aberto.")
+                print("Depois de concluir login e abrir uma pagina autenticada, volte ao terminal.")
+                input("Pressione ENTER para continuar e salvar a sessao... ")
 
             try:
                 page.goto(args.post_login_url, wait_until="domcontentloaded", timeout=args.timeout)
