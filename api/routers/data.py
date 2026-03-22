@@ -12,6 +12,7 @@ Endpoints:
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import logging
 import time
@@ -19,20 +20,19 @@ from datetime import datetime
 from typing import Annotated, AsyncGenerator, Literal, Optional
 
 import orjson
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webscraper.database.connection import get_db
-from webscraper.database.models import ScrapedItem, ScrapingJob
-from webscraper.database.queries import search_items
-from webscraper.api.models.schemas import (
+from database.connection import get_db
+from database.models import ScrapedItem, ScrapingJob
+from models.schemas import (
     DomainStats,
     ItemResponse,
-    PaginatedResponse,
     SearchResponse,
 )
+from rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,9 @@ router = APIRouter(
     O campo `query_time_ms` informa o tempo de execução da query.
     """,
 )
+@limiter.limit("90/minute")
 async def buscar_dados(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     q: Annotated[str, Query(min_length=2, description="Termo de busca (mínimo 2 caracteres)")],
     domain: Annotated[Optional[str], Query(description="Filtrar por domínio (ex: tjsp.jus.br)")] = None,
@@ -170,7 +172,9 @@ async def buscar_dados(
         404: {"description": "Item não encontrado"},
     },
 )
+@limiter.limit("180/minute")
 async def obter_item(
+    request: Request,
     item_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ItemResponse:
@@ -217,7 +221,10 @@ async def obter_item(
     Ordenado por total de itens (mais coletados primeiro).
     """,
 )
+@limiter.limit("60/minute")
 async def listar_dominios(
+    request: Request,
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=200, description="Máximo de domínios")] = 50,
 ) -> list[DomainStats]:
@@ -231,6 +238,8 @@ async def listar_dominios(
     Returns:
         Lista de DomainStats ordenada por total de itens.
     """
+    response.headers["Cache-Control"] = "public, max-age=120"
+
     # Agrupa por domínio e calcula estatísticas
     stmt = (
         select(
@@ -247,7 +256,7 @@ async def listar_dominios(
     result = await db.execute(stmt)
     rows = result.all()
 
-    return [
+    payload = [
         DomainStats(
             domain=row.domain,
             total_items=row.total_items,
@@ -255,6 +264,12 @@ async def listar_dominios(
         )
         for row in rows
     ]
+
+    etag = hashlib.md5(orjson.dumps([item.model_dump(mode="json") for item in payload])).hexdigest()
+    response.headers["ETag"] = f'"{etag}"'
+    response.headers["Last-Modified"] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +380,9 @@ async def _gerar_csv_stream(
         400: {"description": "Formato inválido ou filtros incorretos"},
     },
 )
+@limiter.limit("20/minute")
 async def exportar_dados(
+    request: Request,
     format: Literal["json", "csv"],
     db: Annotated[AsyncSession, Depends(get_db)],
     job_id: Annotated[Optional[int], Query(description="Filtrar por job")] = None,
@@ -389,6 +406,8 @@ async def exportar_dados(
     Returns:
         StreamingResponse com o arquivo para download.
     """
+    response_headers = {"Cache-Control": "no-store"}
+
     # Monta query de busca
     stmt = select(ScrapedItem).order_by(ScrapedItem.scraped_at.desc())
 
@@ -434,6 +453,7 @@ async def exportar_dados(
             _gerar_json_stream(items, meta),
             media_type="application/json",
             headers={
+                **response_headers,
                 "Content-Disposition": f'attachment; filename="{nome_arquivo}.json"',
                 "X-Total-Items": str(len(items)),
             },
@@ -443,6 +463,7 @@ async def exportar_dados(
             _gerar_csv_stream(items),
             media_type="text/csv; charset=utf-8",
             headers={
+                **response_headers,
                 "Content-Disposition": f'attachment; filename="{nome_arquivo}.csv"',
                 "X-Total-Items": str(len(items)),
             },
@@ -464,7 +485,9 @@ async def exportar_dados(
         404: {"description": "Item não encontrado"},
     },
 )
+@limiter.limit("30/minute")
 async def deletar_item(
+    request: Request,
     item_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:

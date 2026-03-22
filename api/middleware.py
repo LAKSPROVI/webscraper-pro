@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Callable
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -49,11 +49,42 @@ http_errors_total = Counter(
 )
 
 # Contador de requisições ativas em andamento
-http_requests_in_progress = Counter(
-    "http_requests_in_progress_total",
-    "Total de requisições processadas (proxy para gauge)",
+http_requests_in_progress = Gauge(
+    "http_requests_in_progress",
+    "Total de requisições HTTP em processamento",
     labelnames=["method", "path"],
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware que adiciona headers de segurança em todas as respostas HTTP.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        response = await call_next(request)
+
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+
+        csp_value = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' ws: wss: http: https:; "
+            "frame-ancestors 'none'"
+        )
+        response.headers["Content-Security-Policy"] = csp_value
+
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -228,34 +259,31 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         # Marca início para medir duração
         start_time = time.perf_counter()
 
-        # Incrementa contador de requisições em andamento
         http_requests_in_progress.labels(method=method, path=path_normalizado).inc()
+        try:
+            response: Response = await call_next(request)
 
-        # Processa a requisição
-        response: Response = await call_next(request)
+            duration = time.perf_counter() - start_time
+            status_code = str(response.status_code)
 
-        # Calcula duração em segundos
-        duration = time.perf_counter() - start_time
-        status_code = str(response.status_code)
-
-        # Atualiza métricas
-        http_requests_total.labels(
-            method=method,
-            path=path_normalizado,
-            status=status_code,
-        ).inc()
-
-        http_request_duration_seconds.labels(
-            method=method,
-            path=path_normalizado,
-        ).observe(duration)
-
-        # Incrementa contador de erros se status >= 400
-        if response.status_code >= 400:
-            http_errors_total.labels(
+            http_requests_total.labels(
                 method=method,
                 path=path_normalizado,
                 status=status_code,
             ).inc()
 
-        return response
+            http_request_duration_seconds.labels(
+                method=method,
+                path=path_normalizado,
+            ).observe(duration)
+
+            if response.status_code >= 400:
+                http_errors_total.labels(
+                    method=method,
+                    path=path_normalizado,
+                    status=status_code,
+                ).inc()
+
+            return response
+        finally:
+            http_requests_in_progress.labels(method=method, path=path_normalizado).dec()

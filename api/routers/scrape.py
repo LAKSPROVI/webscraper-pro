@@ -17,13 +17,14 @@ import time
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webscraper.database.connection import get_db
-from webscraper.database.queries import create_job
-from webscraper.api.models.celery_app import send_scrape_task, send_bulk_scrape_task
-from webscraper.api.models.schemas import (
+from database.connection import get_db
+from database.queries import create_job
+from models.celery_app import send_scrape_task, send_bulk_scrape_task
+from rate_limiter import limiter
+from models.schemas import (
     BulkJobCreatedResponse,
     BulkScrapeRequest,
     JobCreatedResponse,
@@ -66,8 +67,10 @@ router = APIRouter(
         400: {"description": "URL inválida ou parâmetros incorretos"},
     },
 )
+@limiter.limit("20/minute")
 async def criar_scrape(
-    request: ScrapeRequest,
+    request: Request,
+    payload: ScrapeRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobCreatedResponse:
     """
@@ -88,37 +91,37 @@ async def criar_scrape(
         # Cria o registro do job no banco de dados
         job = await create_job(
             db,
-            url=request.url,
-            config_name=request.config_name,
-            spider_type=request.spider_type,
-            render_js=request.render_js,
-            crawl_depth=request.crawl_depth,
-            metadata=request.metadata if request.metadata else None,
+            url=payload.url,
+            config_name=payload.config_name,
+            spider_type=payload.spider_type,
+            render_js=payload.render_js,
+            crawl_depth=payload.crawl_depth,
+            metadata=payload.metadata if payload.metadata else None,
         )
 
         # Envia a task para o broker Celery
         task_id = send_scrape_task(
-            url=request.url,
+            url=payload.url,
             job_id=job.id,
-            config_name=request.config_name,
-            spider_type=request.spider_type,
-            render_js=request.render_js,
-            crawl_depth=request.crawl_depth,
-            metadata=request.metadata,
+            config_name=payload.config_name,
+            spider_type=payload.spider_type,
+            render_js=payload.render_js,
+            crawl_depth=payload.crawl_depth,
+            metadata=payload.metadata,
         )
 
         logger.info(
             "Scraping disparado: job_id=%d task_id=%s url=%s",
             job.id,
             task_id,
-            request.url,
+            payload.url,
         )
 
         # Calcula estimativa de tempo baseada no tipo de spider
-        if request.render_js:
+        if payload.render_js:
             estimativa = "O job deve ser processado em até 120 segundos (renderização JS ativa)"
-        elif request.crawl_depth > 3:
-            estimativa = f"O job deve ser processado em até {request.crawl_depth * 60} segundos (crawling profundo)"
+        elif payload.crawl_depth > 3:
+            estimativa = f"O job deve ser processado em até {payload.crawl_depth * 60} segundos (crawling profundo)"
         else:
             estimativa = "O job deve ser processado em até 60 segundos"
 
@@ -163,8 +166,10 @@ async def criar_scrape(
         400: {"description": "URLs inválidas ou limite excedido"},
     },
 )
+@limiter.limit("5/minute")
 async def criar_bulk_scrape(
-    request: BulkScrapeRequest,
+    request: Request,
+    payload: BulkScrapeRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> BulkJobCreatedResponse:
     """
@@ -185,26 +190,26 @@ async def criar_bulk_scrape(
         job_ids: list[int] = []
 
         # Cria um job para cada URL
-        for url in request.urls:
+        for url in payload.urls:
             job = await create_job(
                 db,
                 url=url,
-                config_name=request.config_name,
-                spider_type=request.spider_type,
-                render_js=request.render_js,
+                config_name=payload.config_name,
+                spider_type=payload.spider_type,
+                render_js=payload.render_js,
                 crawl_depth=1,
-                metadata=request.metadata if request.metadata else None,
+                metadata=payload.metadata if payload.metadata else None,
             )
             job_ids.append(job.id)
 
         # Envia todas as tasks para o broker Celery
         task_ids = send_bulk_scrape_task(
-            urls=request.urls,
+            urls=payload.urls,
             job_ids=job_ids,
-            config_name=request.config_name,
-            spider_type=request.spider_type,
-            render_js=request.render_js,
-            metadata=request.metadata,
+            config_name=payload.config_name,
+            spider_type=payload.spider_type,
+            render_js=payload.render_js,
+            metadata=payload.metadata,
         )
 
         logger.info(
@@ -256,8 +261,10 @@ async def criar_bulk_scrape(
         408: {"description": "Timeout ao acessar a URL"},
     },
 )
+@limiter.limit("30/minute")
 async def preview_scrape(
-    request: PreviewRequest,
+    request: Request,
+    payload: PreviewRequest,
 ) -> PreviewResponse:
     """
     Realiza um preview de scraping sem persistir dados.
@@ -287,7 +294,7 @@ async def preview_scrape(
                 "User-Agent": "Mozilla/5.0 (compatible; WebScraper/1.0; Preview Mode)",
             },
         ) as client:
-            response = await client.get(request.url)
+            response = await client.get(payload.url)
 
             if response.status_code >= 400:
                 raise HTTPException(
@@ -300,14 +307,13 @@ async def preview_scrape(
         # Aplica seletores CSS para extrair campos
         extracted_data: dict = {}
 
-        if request.selectors:
+        if payload.selectors:
             try:
-                from html.parser import HTMLParser
                 # Usa BeautifulSoup se disponível, ou regex simples
                 try:
                     from bs4 import BeautifulSoup
                     soup = BeautifulSoup(html_content, "html.parser")
-                    for campo, seletor in request.selectors.items():
+                    for campo, seletor in payload.selectors.items():
                         elementos = soup.select(seletor)
                         if elementos:
                             # Extrai texto dos elementos encontrados
@@ -343,7 +349,7 @@ async def preview_scrape(
 
         logger.info(
             "Preview realizado: url=%s tempo=%.1fms campos=%d",
-            request.url,
+            payload.url,
             tempo_ms,
             len(extracted_data),
         )
@@ -358,14 +364,14 @@ async def preview_scrape(
 
     except httpx.TimeoutException as exc:
         tempo_ms = (time.perf_counter() - inicio) * 1000
-        logger.warning("Timeout no preview da URL %s: %.1fms", request.url, tempo_ms)
+        logger.warning("Timeout no preview da URL %s: %.1fms", payload.url, tempo_ms)
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
-            detail=f"Timeout ao acessar {request.url}. A URL demorou mais de 30 segundos para responder.",
+            detail=f"Timeout ao acessar {payload.url}. A URL demorou mais de 30 segundos para responder.",
         ) from exc
 
     except httpx.RequestError as exc:
-        logger.warning("Erro de conexão no preview da URL %s: %s", request.url, exc)
+        logger.warning("Erro de conexão no preview da URL %s: %s", payload.url, exc)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Não foi possível acessar a URL: {str(exc)}",

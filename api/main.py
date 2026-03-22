@@ -27,12 +27,17 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-from webscraper.database.connection import check_db, close_db, init_db
-from webscraper.api.middleware import PrometheusMiddleware, RequestLoggingMiddleware
-from webscraper.api.routers import data, jobs, schedule, scrape, spiders
+from database.connection import check_db, close_db, init_db
+from middleware import PrometheusMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
+from rate_limiter import limiter
+from routers import auth, data, jobs, schedule, scrape, spiders
 
 # ---------------------------------------------------------------------------
 # Configuração de Logging
@@ -52,6 +57,8 @@ API_VERSION: str = os.getenv("API_VERSION", "v1")
 API_ENV: str = os.getenv("API_ENV", "development")
 API_DEBUG: bool = os.getenv("API_DEBUG", "false").lower() == "true"
 REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
+ALLOWED_HOSTS_RAW: str = os.getenv("API_ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS: list[str] = [host.strip() for host in ALLOWED_HOSTS_RAW.split(",") if host.strip()]
 
 # Origens CORS — lê da env e divide por vírgula
 _cors_origins_raw = os.getenv(
@@ -160,6 +167,28 @@ Todos os endpoints estão sob o prefixo `/api/v1/`.
     lifespan=lifespan,
     debug=API_DEBUG,
 )
+app.state.limiter = limiter
+
+
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, RateLimitExceeded):
+        detail = str(exc.detail) if getattr(exc, "detail", None) else "Limite de requisições excedido"
+    else:
+        detail = "Limite de requisições excedido"
+
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "erro": "Muitas requisições",
+            "detalhes": detail,
+            "codigo": 429,
+            "path": request.url.path,
+        },
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +203,14 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=ALLOWED_HOSTS if ALLOWED_HOSTS else ["*"],
+)
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Logging de requisições (exclui health/metrics para não poluir o log)
 app.add_middleware(
@@ -283,6 +320,9 @@ async def handler_http_exception(request: Request, exc: HTTPException) -> JSONRe
 
 # Router de scraping imediato
 app.include_router(scrape.router)
+
+# Router de autenticação
+app.include_router(auth.router)
 
 # Router de gerenciamento de jobs
 app.include_router(jobs.router)

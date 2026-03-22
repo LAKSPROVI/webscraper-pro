@@ -96,7 +96,7 @@ def send_scrape_task(
     """
     # Usa .send_task() para não precisar importar a task do worker
     result = celery_client.send_task(
-        "scraper.tasks.scrape_url",
+        "worker.tasks.scrape_url",
         args=[],
         kwargs={
             "url": url,

@@ -21,24 +21,25 @@ from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webscraper.database.connection import get_db
-from webscraper.database.models import JobStatus, ScrapedItem, ScrapingJob
-from webscraper.database.queries import (
+from database.connection import get_db
+from database.models import JobStatus, ScrapedItem, ScrapingJob
+from database.queries import (
     get_items_by_job,
     get_job,
     list_jobs,
     update_job_status,
 )
-from webscraper.api.models.celery_app import revoke_task
-from webscraper.api.models.schemas import (
+from models.celery_app import revoke_task
+from models.schemas import (
     ItemResponse,
     JobResponse,
     PaginatedResponse,
 )
+from rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,10 @@ router = APIRouter(
     Ordenação padrão: mais recentes primeiro (created_at DESC).
     """,
 )
+@limiter.limit("120/minute")
 async def listar_jobs(
+    request: Request,
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     status_filtro: Annotated[
         Optional[str],
@@ -96,6 +100,8 @@ async def listar_jobs(
     Returns:
         PaginatedResponse com lista de JobResponse e metadados de paginação.
     """
+    response.headers["Cache-Control"] = "private, max-age=10"
+
     # Valida o status se fornecido
     status_enum: Optional[JobStatus] = None
     if status_filtro:
@@ -151,7 +157,10 @@ async def listar_jobs(
         404: {"description": "Job não encontrado"},
     },
 )
+@limiter.limit("240/minute")
 async def obter_job(
+    request: Request,
+    response: Response,
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobResponse:
@@ -168,6 +177,8 @@ async def obter_job(
     Raises:
         HTTPException 404: Se o job não existir.
     """
+    response.headers["Cache-Control"] = "private, max-age=5"
+
     job = await get_job(db, job_id)
 
     if job is None:
@@ -201,7 +212,9 @@ async def obter_job(
         409: {"description": "Job já concluído ou cancelado"},
     },
 )
+@limiter.limit("30/minute")
 async def cancelar_job(
+    request: Request,
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
@@ -262,7 +275,10 @@ async def cancelar_job(
         404: {"description": "Job não encontrado"},
     },
 )
+@limiter.limit("180/minute")
 async def listar_items_do_job(
+    request: Request,
+    response: Response,
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     page: Annotated[int, Query(ge=1)] = 1,
@@ -283,6 +299,8 @@ async def listar_items_do_job(
     Raises:
         HTTPException 404: Se o job não existir.
     """
+    response.headers["Cache-Control"] = "private, max-age=10"
+
     # Verifica se o job existe
     job = await get_job(db, job_id)
     if job is None:
