@@ -42,6 +42,10 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
   - seletor CSS para aguardar carregamento da página alvo.
 - `JUSBRASIL_TARGET_WAIT_MS`
   - timeout de espera da navegação/selector em milissegundos.
+- `JUSBRASIL_CHALLENGE_RETRY_ATTEMPTS`
+  - quantidade de tentativas de estabilizacao quando detectar pagina de challenge.
+- `JUSBRASIL_CHALLENGE_RETRY_WAIT_MS`
+  - espera entre tentativas de reload quando challenge for detectado.
 
 ## Uso pratico
 
@@ -123,6 +127,8 @@ export JUSBRASIL_WARMUP_URLS_JSON='["https://www.jusbrasil.com.br/","https://www
 export JUSBRASIL_WARMUP_WAIT_MS='2000'
 export JUSBRASIL_TARGET_WAIT_SELECTOR='body'
 export JUSBRASIL_TARGET_WAIT_MS='12000'
+export JUSBRASIL_CHALLENGE_RETRY_ATTEMPTS='3'
+export JUSBRASIL_CHALLENGE_RETRY_WAIT_MS='10000'
 ```
 
 ### Automacao via script

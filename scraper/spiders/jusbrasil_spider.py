@@ -96,6 +96,16 @@ class JusbrasilSpider(scrapy.Spider):
             "JUSBRASIL_TARGET_WAIT_MS",
             default=8000,
         )
+        self.challenge_retry_attempts = self._resolve_int(
+            "challenge_retry_attempts",
+            "JUSBRASIL_CHALLENGE_RETRY_ATTEMPTS",
+            default=2,
+        )
+        self.challenge_retry_wait_ms = self._resolve_int(
+            "challenge_retry_wait_ms",
+            "JUSBRASIL_CHALLENGE_RETRY_WAIT_MS",
+            default=7000,
+        )
         cookies_json = self._resolve_json(
             "cookies_json",
             "JUSBRASIL_COOKIES_JSON",
@@ -231,6 +241,17 @@ class JusbrasilSpider(scrapy.Spider):
 
         return meta
 
+    def _looks_like_challenge(self, html_text: str, title: str) -> bool:
+        haystack = f"{title}\n{html_text}".lower()
+        indicators = (
+            "enable javascript and cookies to continue",
+            "challenge-platform",
+            "cf_chl_opt",
+            "verificacao bem-sucedida. esperando a resposta",
+            "por favor complete essa etapa de seguranca",
+        )
+        return any(token in haystack for token in indicators)
+
     def start_requests(self):
         for url in self.start_urls:
             if self.render_js:
@@ -254,9 +275,12 @@ class JusbrasilSpider(scrapy.Spider):
         page = response.meta.get("playwright_page")
         html_text = response.text or ""
         title = (response.css("title::text").get() or "").strip()
+        status_code = int(getattr(response, "status", 0) or 0)
+        challenge_retry_used = 0
 
         if page is not None:
             try:
+                last_nav_response = None
                 for warmup_url in self.warmup_urls:
                     try:
                         await page.goto(warmup_url, wait_until="domcontentloaded", timeout=self.target_wait_ms)
@@ -266,7 +290,11 @@ class JusbrasilSpider(scrapy.Spider):
                         self._warn("Falha no warm-up URL=%s: %s", warmup_url, exc)
 
                 if self.warmup_urls:
-                    await page.goto(response.url, wait_until="domcontentloaded", timeout=self.target_wait_ms)
+                    last_nav_response = await page.goto(
+                        response.url,
+                        wait_until="domcontentloaded",
+                        timeout=self.target_wait_ms,
+                    )
 
                 if self.target_wait_selector:
                     try:
@@ -280,6 +308,49 @@ class JusbrasilSpider(scrapy.Spider):
 
                 html_text = await page.content()
                 title = (await page.title() or "").strip()
+
+                if last_nav_response is not None:
+                    try:
+                        status_code = int(last_nav_response.status)
+                    except Exception:
+                        pass
+
+                if self.challenge_retry_attempts > 0 and self._looks_like_challenge(html_text, title):
+                    for attempt in range(1, self.challenge_retry_attempts + 1):
+                        challenge_retry_used = attempt
+                        self._warn(
+                            "Challenge detectado em %s, tentativa de estabilizacao %d/%d",
+                            response.url,
+                            attempt,
+                            self.challenge_retry_attempts,
+                        )
+                        if self.challenge_retry_wait_ms > 0:
+                            await page.wait_for_timeout(self.challenge_retry_wait_ms)
+                        reload_response = await page.reload(
+                            wait_until="domcontentloaded",
+                            timeout=self.target_wait_ms,
+                        )
+                        if self.target_wait_selector:
+                            try:
+                                await page.wait_for_selector(
+                                    self.target_wait_selector,
+                                    timeout=self.target_wait_ms,
+                                )
+                            except Exception:
+                                self._warn(
+                                    "Selector de espera nao encontrado apos retry em %s: %s",
+                                    response.url,
+                                    self.target_wait_selector,
+                                )
+                        html_text = await page.content()
+                        title = (await page.title() or "").strip()
+                        if reload_response is not None:
+                            try:
+                                status_code = int(reload_response.status)
+                            except Exception:
+                                pass
+                        if not self._looks_like_challenge(html_text, title):
+                            break
             finally:
                 await page.close()
 
@@ -287,7 +358,6 @@ class JusbrasilSpider(scrapy.Spider):
             response.css("body *:not(script):not(style)::text").getall()
         ).strip()
 
-        status_code = int(getattr(response, "status", 0) or 0)
         if not clean_text:
             if status_code in (403, 429):
                 clean_text = f"blocked_by_target status={status_code} url={response.url}"
@@ -310,6 +380,8 @@ class JusbrasilSpider(scrapy.Spider):
             "source": "jusbrasil_spider",
             "authenticated_session": bool(self.storage_state_path or self.cookie_header or self.cookies_json),
             "warmup_urls_used": self.warmup_urls,
+            "challenge_detected": self._looks_like_challenge(html_text, title),
+            "challenge_retry_attempts": challenge_retry_used,
         }
 
         yield item
