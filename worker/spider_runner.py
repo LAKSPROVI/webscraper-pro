@@ -177,6 +177,10 @@ class SpiderRunner:
             from scrapy.utils.project import get_project_settings  # noqa: PLC0415
             from scrapy.utils.log import configure_logging  # noqa: PLC0415
 
+            # Garante que o Scrapy carregue as settings do projeto (pipelines,
+            # middlewares e integrações), mesmo quando executado via Celery.
+            os.environ.setdefault("SCRAPY_SETTINGS_MODULE", "scraper.settings")
+
             # Configurações do Scrapy
             settings = get_project_settings()
 
