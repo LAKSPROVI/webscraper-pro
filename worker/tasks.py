@@ -142,7 +142,7 @@ def scrape_url(
         render_js,
     )
 
-    async def _executar() -> dict[str, Any]:
+    async def _preparar_execucao() -> dict[str, Any]:
         from sqlalchemy import select, update as sa_update
         from database.models import ScrapingJob, SpiderConfig, JobStatus
 
@@ -190,6 +190,12 @@ def scrape_url(
         finally:
             await engine.dispose()
 
+        return {"config": config}
+
+    try:
+        preparo = _run_async(_preparar_execucao())
+        config = preparo.get("config", {})
+
         # ── Passo 3: Publica evento de início ────────────────────────────
         publisher.job_started(
             job_id=job_id,
@@ -197,7 +203,7 @@ def scrape_url(
             worker_id=self.request.id,
         )
 
-        # ── Passo 4: Executa o spider ────────────────────────────────────
+        # ── Passo 4: Executa o spider (fora do loop async) ───────────────
         from .spider_runner import SpiderRunner  # noqa: PLC0415
 
         runner = SpiderRunner()
@@ -211,11 +217,6 @@ def scrape_url(
             crawl_depth=crawl_depth,
         )
 
-        return {"items_count": items_count}
-
-    try:
-        resultado = _run_async(_executar())
-        items_count = resultado["items_count"]
         fim = datetime.now(timezone.utc)
         duracao = (fim - inicio).total_seconds()
 
