@@ -60,11 +60,17 @@ class JusbrasilSpider(scrapy.Spider):
                     meta={
                         "playwright": True,
                         "playwright_include_page": True,
+                        "handle_httpstatus_all": True,
                     },
                     dont_filter=True,
                 )
             else:
-                yield scrapy.Request(url, callback=self.parse, dont_filter=True)
+                yield scrapy.Request(
+                    url,
+                    callback=self.parse,
+                    meta={"handle_httpstatus_all": True},
+                    dont_filter=True,
+                )
 
     async def parse(self, response: Any, **kwargs: Any):
         page = response.meta.get("playwright_page")
