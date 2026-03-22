@@ -18,6 +18,7 @@ import random
 import time
 from collections import defaultdict
 from typing import Optional
+from urllib.parse import urlparse
 
 import redis as redis_lib
 from scrapy.http import Request, Response
@@ -215,7 +216,21 @@ class ProxyMiddleware:
 
         proxy = self._get_next_proxy()
         if proxy:
-            request.meta["proxy"] = proxy
+            # scrapy-playwright não usa request.meta["proxy"] para navegação;
+            # precisa de proxy no contexto do navegador.
+            if request.meta.get("playwright"):
+                parsed = urlparse(proxy)
+                server = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+                context_kwargs = dict(request.meta.get("playwright_context_kwargs") or {})
+                proxy_config = {"server": server}
+                if parsed.username:
+                    proxy_config["username"] = parsed.username
+                if parsed.password:
+                    proxy_config["password"] = parsed.password
+                context_kwargs["proxy"] = proxy_config
+                request.meta["playwright_context_kwargs"] = context_kwargs
+            else:
+                request.meta["proxy"] = proxy
             # Rastreia qual proxy foi usado (para contabilizar resultado)
             request.meta["proxy_used"] = proxy
             logger.debug(f"Usando proxy {proxy[:30]}... para {request.url[:60]}")
