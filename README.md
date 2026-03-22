@@ -221,6 +221,27 @@ curl -X POST http://localhost:8000/api/v1/scrape \
 
 ## 🔌 API Reference
 
+### Sessao autenticada para sites assinados (ex.: Jusbrasil)
+
+Para alvos que exigem assinatura ativa, use sessao autenticada legitima do assinante.
+
+Fluxo rapido:
+
+```bash
+# 1) Gerar storage state local com login manual
+.venv/bin/python scripts/export_jusbrasil_storage_state.py \
+  --output sessions/jusbrasil.storage-state.json
+
+# 2) Aplicar no servidor e disparar smoke test
+bash scripts/apply_jusbrasil_session.sh \
+  --host 77.42.68.212 \
+  --user webscraper \
+  --state-file sessions/jusbrasil.storage-state.json \
+  --api-url https://api.77.42.68.212.nip.io
+```
+
+Guia completo: `docs/authenticated-scraping.md`
+
 ### Health Check
 
 ```bash

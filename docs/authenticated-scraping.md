@@ -31,6 +31,25 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
 
 ## Uso pratico
 
+### Gerar storage state local (login manual)
+
+1. Instalar browser do Playwright (uma vez):
+
+```bash
+.venv/bin/python -m playwright install chromium
+```
+
+2. Gerar sessao autenticada com login manual:
+
+```bash
+.venv/bin/python scripts/export_jusbrasil_storage_state.py \
+  --output sessions/jusbrasil.storage-state.json
+```
+
+3. O script abre navegador visivel para voce logar manualmente.
+4. Depois do login (e MFA, se houver), volte ao terminal e pressione ENTER.
+5. O arquivo `sessions/jusbrasil.storage-state.json` sera criado para uso no deploy.
+
 ### Request via API
 
 Exemplo de request com spider dedicado:
@@ -63,7 +82,7 @@ Use o script operacional para aplicar sessao e testar em uma execucao:
 bash scripts/apply_jusbrasil_session.sh \
   --host 77.42.68.212 \
   --user webscraper \
-  --state-file /caminho/local/storage_state.json \
+  --state-file sessions/jusbrasil.storage-state.json \
   --api-url https://api.77.42.68.212.nip.io
 ```
 
