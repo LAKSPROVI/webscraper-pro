@@ -55,6 +55,24 @@ Exemplo de request com spider dedicado:
 3. Reiniciar apenas os services `webscraper-*`.
 4. Rodar o teste no endpoint de scrape.
 
+### Automacao via script
+
+Use o script operacional para aplicar sessao e testar em uma execucao:
+
+```bash
+bash scripts/apply_jusbrasil_session.sh \
+  --host 77.42.68.212 \
+  --user webscraper \
+  --state-file /caminho/local/storage_state.json \
+  --api-url https://api.77.42.68.212.nip.io
+```
+
+O script executa:
+1. Upload seguro do `storage_state.json` para `/opt/webscraper-pro/env/sessions/`.
+2. Atualizacao de `JUSBRASIL_STORAGE_STATE_PATH` no `.env.production` remoto.
+3. Reinicio de `webscraper-worker` e `webscraper-scheduler`.
+4. Disparo de um smoke test no endpoint `POST /api/v1/scrape`.
+
 ## Observacoes
 
 - Se o site devolver 403 mesmo com sessao valida, o proximo passo e ajustar sequencia de warm-up da sessao e afinidade de IP.
