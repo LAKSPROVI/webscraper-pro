@@ -72,3 +72,8 @@ copilot_chat_export.md
 STRATEGY_COPILOT_EXPORT.md
 docs/copilot-sessions/
 scripts/export_copilot_chat.py
+
+# Sessao autenticada local para scraping
+*.storage-state.json
+*.cookies.json
+sessions/
