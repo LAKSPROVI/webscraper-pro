@@ -168,3 +168,4 @@ O script executa:
 - Quando usar sessao autenticada, prefira proxy fixo por contexto para manter fingerprint e IP consistentes.
 - Se houver conteudo disponivel apenas apos navegacao interna, o spider deve visitar primeiro home, busca ou pagina intermediaria antes da URL alvo.
 - `render_js=true` costuma ser o modo mais consistente para conteudo autenticado.
+- Quando o worker detectar challenge anti-bot no fluxo Jusbrasil, o endpoint `GET /api/v1/jobs/{job_id}` passa a retornar em `metadata.operator_action` um aviso operacional com URL e comando sugerido para renovacao manual da sessao.

@@ -18,6 +18,7 @@ Todas as tasks possuem:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from datetime import datetime, timezone, timedelta
@@ -239,6 +240,77 @@ def scrape_url(
                 job_id,
             )
         items_count = persisted_items_count
+
+        async def _sinalizar_intervencao_operador() -> None:
+            """Registra orientação operacional quando detectar challenge anti-bot."""
+            from sqlalchemy import select, update as sa_update
+            from database.models import ScrapedItem, ScrapingJob
+
+            if spider_type != "jusbrasil" and "jusbrasil.com.br" not in (url or ""):
+                return
+
+            factory, engine = await _get_db_session()
+            try:
+                async with factory() as session:
+                    job_result = await session.execute(
+                        select(ScrapingJob).where(ScrapingJob.id == job_id)
+                    )
+                    job = job_result.scalar_one_or_none()
+                    if job is None:
+                        return
+
+                    item_result = await session.execute(
+                        select(ScrapedItem)
+                        .where(ScrapedItem.job_id == job_id)
+                        .order_by(ScrapedItem.scraped_at.desc())
+                        .limit(1)
+                    )
+                    latest_item = item_result.scalar_one_or_none()
+                    if latest_item is None:
+                        return
+
+                    content_text = (latest_item.content or "").lower()
+                    raw_text = ""
+                    if isinstance(latest_item.raw_data, dict):
+                        raw_text = json.dumps(latest_item.raw_data, ensure_ascii=False).lower()
+
+                    indicators = (
+                        "enable javascript and cookies to continue",
+                        "challenge-platform",
+                        "cf_chl_opt",
+                        "por favor complete essa etapa de seguranca",
+                        "verificacao bem-sucedida. esperando a resposta",
+                    )
+                    blocked = any(token in content_text or token in raw_text for token in indicators)
+                    if not blocked:
+                        return
+
+                    merged_metadata = dict(job.metadata_ or {})
+                    merged_metadata["challenge_detected"] = True
+                    merged_metadata["challenge_source"] = "cloudflare"
+                    merged_metadata["challenge_detected_at"] = datetime.now(timezone.utc).isoformat()
+                    merged_metadata["operator_action"] = {
+                        "required": True,
+                        "type": "manual_session_refresh",
+                        "message": "Challenge anti-bot detectado. Operador deve renovar sessao manualmente.",
+                        "open_url": "https://www.jusbrasil.com.br/login",
+                        "next_step_command": ".venv/bin/python scripts/export_jusbrasil_storage_state.py --output sessions/jusbrasil.storage-state.json",
+                    }
+
+                    await session.execute(
+                        sa_update(ScrapingJob)
+                        .where(ScrapingJob.id == job_id)
+                        .values(metadata_=merged_metadata)
+                    )
+                    await session.commit()
+                    logger.warning(
+                        "[scrape_url] Intervenção do operador requerida: job_id=%d challenge_detected",
+                        job_id,
+                    )
+            finally:
+                await engine.dispose()
+
+        _run_async(_sinalizar_intervencao_operador())
 
         fim = datetime.now(timezone.utc)
         duracao = (fim - inicio).total_seconds()

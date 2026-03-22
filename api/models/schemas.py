@@ -333,9 +333,16 @@ class JobResponse(BaseModel):
     crawl_depth: int = Field(default=1, description="Profundidade de crawling utilizada")
     items_scraped: int = Field(default=0, description="Quantidade de itens coletados")
     error_msg: Optional[str] = Field(default=None, description="Mensagem de erro (se houver)")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        alias="metadata_",
+        description="Metadados do job, incluindo alertas operacionais",
+    )
     created_at: datetime = Field(..., description="Data/hora de criação")
     started_at: Optional[datetime] = Field(default=None, description="Data/hora de início")
     completed_at: Optional[datetime] = Field(default=None, description="Data/hora de conclusão")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @computed_field
     @property
