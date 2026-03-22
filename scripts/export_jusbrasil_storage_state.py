@@ -14,6 +14,7 @@ import argparse
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -54,7 +55,52 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Tenta login automatico com JUSBRASIL_EMAIL e JUSBRASIL_PASSWORD",
     )
+    parser.add_argument(
+        "--proxy-server",
+        default="",
+        help="Proxy Playwright no formato protocolo://host:porta",
+    )
+    parser.add_argument(
+        "--proxy-username",
+        default="",
+        help="Usuario do proxy (opcional)",
+    )
+    parser.add_argument(
+        "--proxy-password",
+        default="",
+        help="Senha do proxy (opcional)",
+    )
     return parser.parse_args()
+
+
+def _build_proxy_config(args: argparse.Namespace) -> dict[str, str] | None:
+    server = (args.proxy_server or os.getenv("JUSBRASIL_PLAYWRIGHT_PROXY_SERVER", "")).strip()
+    username = (args.proxy_username or os.getenv("JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME", "")).strip()
+    password = (args.proxy_password or os.getenv("JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD", "")).strip()
+
+    if not server:
+        host = os.getenv("BRIGHTDATA_PROXY_HOST", "").strip()
+        port = os.getenv("BRIGHTDATA_PROXY_PORT", "").strip()
+        if host and port:
+            server = f"http://{host}:{port}"
+        if not username:
+            username = os.getenv("BRIGHTDATA_PROXY_USER", "").strip()
+        if not password:
+            password = os.getenv("BRIGHTDATA_PROXY_PASS", "").strip()
+
+    if not server:
+        return None
+
+    parsed = urlparse(server)
+    if not parsed.scheme or not parsed.hostname or not parsed.port:
+        raise ValueError("Proxy inválido. Use formato protocolo://host:porta")
+
+    proxy: dict[str, str] = {"server": f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"}
+    if username:
+        proxy["username"] = username
+    if password:
+        proxy["password"] = password
+    return proxy
 
 
 def _try_auto_login(page: Any, timeout_ms: int) -> bool:
@@ -131,12 +177,18 @@ def main() -> int:
     args = parse_args()
     output_path = Path(args.output).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    proxy_config = _build_proxy_config(args)
 
     print("Abrindo navegador para login manual no Jusbrasil...")
+    if proxy_config:
+        print(f"Usando proxy fixo para exportacao: {proxy_config['server']}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=args.headless)
-        context = browser.new_context(locale="pt-BR")
+        context_kwargs: dict[str, Any] = {"locale": "pt-BR"}
+        if proxy_config:
+            context_kwargs["proxy"] = proxy_config
+        context = browser.new_context(**context_kwargs)
         page = context.new_page()
 
         try:

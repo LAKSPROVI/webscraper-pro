@@ -65,6 +65,18 @@ class JusbrasilSpider(scrapy.Spider):
             "session_cookie_header",
             "JUSBRASIL_COOKIE_HEADER",
         )
+        self.playwright_proxy_server = self._resolve_str(
+            "playwright_proxy_server",
+            "JUSBRASIL_PLAYWRIGHT_PROXY_SERVER",
+        )
+        self.playwright_proxy_username = self._resolve_str(
+            "playwright_proxy_username",
+            "JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME",
+        )
+        self.playwright_proxy_password = self._resolve_str(
+            "playwright_proxy_password",
+            "JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD",
+        )
         cookies_json = self._resolve_json(
             "cookies_json",
             "JUSBRASIL_COOKIES_JSON",
@@ -167,6 +179,14 @@ class JusbrasilSpider(scrapy.Spider):
                 "cookies": self.cookies_json,
                 "origins": [],
             }
+
+        if self.playwright_proxy_server:
+            proxy: dict[str, str] = {"server": self.playwright_proxy_server}
+            if self.playwright_proxy_username:
+                proxy["username"] = self.playwright_proxy_username
+            if self.playwright_proxy_password:
+                proxy["password"] = self.playwright_proxy_password
+            meta["playwright_context_kwargs"]["proxy"] = proxy
 
         return meta
 

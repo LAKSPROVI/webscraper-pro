@@ -210,6 +210,11 @@ class ProxyMiddleware:
         if force_proxy is False:
             return
 
+        if request.meta.get("playwright"):
+            context_kwargs = request.meta.get("playwright_context_kwargs") or {}
+            if isinstance(context_kwargs, dict) and context_kwargs.get("proxy"):
+                return
+
         # Recarrega proxies do Redis periodicamente (a cada 100 requests)
         if random.random() < 0.01:  # ~1% das vezes
             self._load_proxies_from_redis()

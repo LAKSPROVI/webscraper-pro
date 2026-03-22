@@ -28,6 +28,12 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
   - header `Cookie` pronto para requests HTTP sem JS.
 - `JUSBRASIL_EXTRA_HEADERS_JSON`
   - headers extras em JSON para reproduzir melhor a sessao autenticada.
+- `JUSBRASIL_PLAYWRIGHT_PROXY_SERVER`
+  - proxy fixo para contexto Playwright no formato `http://host:porta`.
+- `JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME`
+  - usuario do proxy fixo.
+- `JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD`
+  - senha do proxy fixo.
 
 ## Uso pratico
 
@@ -44,6 +50,20 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
 ```bash
 .venv/bin/python scripts/export_jusbrasil_storage_state.py \
   --output sessions/jusbrasil.storage-state.json
+```
+
+Opcao recomendada para afinidade de sessao (mesmo proxy no login e no scrape):
+
+```bash
+export JUSBRASIL_PLAYWRIGHT_PROXY_SERVER="http://brd.superproxy.io:33335"
+export JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME="seu_usuario_proxy"
+export JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD="sua_senha_proxy"
+
+.venv/bin/python scripts/export_jusbrasil_storage_state.py \
+  --output sessions/jusbrasil.storage-state.json \
+  --proxy-server "$JUSBRASIL_PLAYWRIGHT_PROXY_SERVER" \
+  --proxy-username "$JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME" \
+  --proxy-password "$JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD"
 ```
 
 3. O script abre navegador visivel para voce logar manualmente.
@@ -109,5 +129,6 @@ O script executa:
 ## Observacoes
 
 - Se o site devolver 403 mesmo com sessao valida, o proximo passo e ajustar sequencia de warm-up da sessao e afinidade de IP.
+- Quando usar sessao autenticada, prefira proxy fixo por contexto para manter fingerprint e IP consistentes.
 - Se houver conteudo disponivel apenas apos navegacao interna, o spider deve visitar primeiro home, busca ou pagina intermediaria antes da URL alvo.
 - `render_js=true` costuma ser o modo mais consistente para conteudo autenticado.
