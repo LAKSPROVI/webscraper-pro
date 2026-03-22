@@ -65,3 +65,10 @@ downloads/
 frontend/node_modules/
 frontend/dist/
 frontend/storybook-static/
+
+# Artefatos locais de export/sessao do Copilot
+copilot_chat_export.json
+copilot_chat_export.md
+STRATEGY_COPILOT_EXPORT.md
+docs/copilot-sessions/
+scripts/export_copilot_chat.py
