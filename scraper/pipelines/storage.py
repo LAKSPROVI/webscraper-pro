@@ -15,6 +15,8 @@ compatível com o ambiente síncrono do Scrapy sem monkey-patching.
 """
 
 import asyncio
+import hashlib
+import json
 import logging
 import threading
 from datetime import datetime, timezone
@@ -161,16 +163,34 @@ class StoragePipeline:
 
         Mapeia campos do item Scrapy para colunas do modelo ScrapedItemModel.
         """
+        raw_data = item.get("raw_data")
+        if isinstance(raw_data, (dict, list)):
+            raw_payload = raw_data
+        else:
+            raw_payload = {"raw": str(raw_data or "")}
+
+        hash_payload = json.dumps(
+            {
+                "job_id": item.get("job_id"),
+                "url": str(item.get("url") or ""),
+                "title": str(item.get("title") or ""),
+                "content": str(item.get("content") or ""),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
         return {
             "job_id": item.get("job_id"),
             "url": str(item.get("url") or ""),
             "title": str(item.get("title") or "")[:500],  # Limita ao tamanho da coluna
             "content": str(item.get("content") or ""),
-            "raw_data": str(item.get("raw_data") or ""),
+            "raw_data": raw_payload,
             "domain": str(item.get("domain") or ""),
             "spider_name": str(item.get("spider_name") or ""),
+            "content_hash": hashlib.sha256(hash_payload.encode("utf-8")).hexdigest(),
             "scraped_at": item.get("scraped_at") or datetime.now(timezone.utc).isoformat(),
-            "metadata_": item.get("metadata") or {},  # Mapeado para campo "metadata" no DB
+            "metadata": item.get("metadata") or {},
         }
 
     def _flush_buffer(self) -> None:
@@ -208,19 +228,12 @@ class StoragePipeline:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         async with get_session() as session:
-            # Prepara os dados para bulk insert
-            # Normaliza o campo metadata_ para o formato do modelo
-            insert_data = []
-            for item_dict in items:
-                data = dict(item_dict)
-                # Renomeia metadata_ para metadata (nome da coluna no DB)
-                if "metadata_" in data:
-                    data["metadata"] = data.pop("metadata_")
-                insert_data.append(data)
+            # Prepara os dados para bulk insert usando nomes de coluna da tabela
+            insert_data = [dict(item_dict) for item_dict in items]
 
             # Usa INSERT ... ON CONFLICT DO NOTHING para segurança
             # (evita duplicatas que escaparam da dedup pipeline)
-            stmt = pg_insert(ScrapedItemModel).values(insert_data)
+            stmt = pg_insert(ScrapedItemModel.__table__).values(insert_data)
             stmt = stmt.on_conflict_do_nothing(index_elements=["content_hash"])
 
             try:
