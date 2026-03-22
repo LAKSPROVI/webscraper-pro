@@ -102,6 +102,7 @@ def scrape_url(
     spider_type: str = "generic",
     config_name: str | None = None,
     render_js: bool = False,
+    use_proxy: bool | None = None,
     crawl_depth: int = 1,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -204,6 +205,7 @@ def scrape_url(
             spider_type=spider_type,
             config=config,
             render_js=render_js,
+            use_proxy=use_proxy,
             crawl_depth=crawl_depth,
         )
 

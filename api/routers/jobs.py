@@ -11,14 +11,12 @@ WebSocket:
     WS /api/v1/ws/jobs — Stream de updates de todos os jobs em tempo real
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Annotated, Optional
+from typing import Any, Annotated, Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
@@ -75,7 +73,7 @@ router = APIRouter(
 async def listar_jobs(
     request: Request,
     response: Response,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     status_filtro: Annotated[
         Optional[str],
         Query(alias="status", description="Filtrar por status: pending, running, done, failed, cancelled"),
@@ -162,7 +160,7 @@ async def obter_job(
     request: Request,
     response: Response,
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> JobResponse:
     """
     Retorna os detalhes completos de um job de scraping.
@@ -216,7 +214,7 @@ async def obter_job(
 async def cancelar_job(
     request: Request,
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> None:
     """
     Cancela um job de scraping.
@@ -280,7 +278,7 @@ async def listar_items_do_job(
     request: Request,
     response: Response,
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> PaginatedResponse[ItemResponse]:

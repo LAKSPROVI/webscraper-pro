@@ -37,6 +37,7 @@ class ScrapeRequest(BaseModel):
                 "config_name": "tjsp_jurisprudencia",
                 "spider_type": "generic",
                 "render_js": False,
+                "use_proxy": None,
                 "crawl_depth": 1,
                 "metadata": {"categoria": "acórdão", "tribunal": "TJSP"},
             }
@@ -63,6 +64,10 @@ class ScrapeRequest(BaseModel):
     render_js: bool = Field(
         default=False,
         description="Se deve renderizar JavaScript (usa Playwright)",
+    )
+    use_proxy: Optional[bool] = Field(
+        default=None,
+        description="Força uso de proxy: true/false. Null = segue configuração global/spider.",
     )
     crawl_depth: int = Field(
         default=1,
@@ -106,6 +111,7 @@ class BulkScrapeRequest(BaseModel):
                 "config_name": "tjsp_generic",
                 "spider_type": "generic",
                 "render_js": False,
+                "use_proxy": None,
             }
         }
     )
@@ -119,6 +125,7 @@ class BulkScrapeRequest(BaseModel):
     config_name: Optional[str] = Field(default=None, max_length=255)
     spider_type: str = Field(default="generic")
     render_js: bool = Field(default=False)
+    use_proxy: Optional[bool] = Field(default=None)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("urls")

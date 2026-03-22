@@ -9,11 +9,9 @@ Endpoints:
     POST   /api/v1/schedule/{id}/toggle — Ativar/desativar agendamento
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import datetime, timezone
-from typing import Annotated, Optional
+from typing import Any, Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, select, update
@@ -89,7 +87,7 @@ def _calcular_proxima_execucao(cron_expression: str) -> Optional[datetime]:
     """,
 )
 async def listar_agendamentos(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     include_disabled: Annotated[bool, Query(description="Incluir agendamentos desabilitados")] = False,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -162,7 +160,7 @@ async def listar_agendamentos(
 )
 async def criar_agendamento(
     request: CreateScheduledJob,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> ScheduledJobResponse:
     """
     Cria um novo agendamento de scraping.
@@ -236,7 +234,7 @@ async def criar_agendamento(
 async def atualizar_agendamento(
     schedule_id: int,
     request: UpdateScheduledJob,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> ScheduledJobResponse:
     """
     Atualiza um agendamento existente.
@@ -323,7 +321,7 @@ async def atualizar_agendamento(
 )
 async def deletar_agendamento(
     schedule_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> None:
     """
     Deleta permanentemente um agendamento.
@@ -375,7 +373,7 @@ async def deletar_agendamento(
 )
 async def toggle_agendamento(
     schedule_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> ScheduledJobResponse:
     """
     Alterna o estado de habilitação de um agendamento.

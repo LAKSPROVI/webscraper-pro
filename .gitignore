@@ -8,6 +8,11 @@
 .env.production
 .env.staging
 
+# Credenciais locais (NUNCA versionar)
+CREDENTIALS*
+*.credentials
+*.secret
+
 # Dados gerados pelos containers (não versionar)
 *.db
 *.sqlite

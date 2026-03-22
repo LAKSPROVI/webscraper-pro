@@ -40,8 +40,24 @@ export interface ScrapeRequest {
   url: string
   spider_type: string
   render_js?: boolean
+  use_proxy?: boolean | null
   crawl_depth?: number
   config?: Record<string, unknown>
+}
+
+export interface ProxySettingsResponse {
+  enabled: boolean
+  enabled_raw?: string | null
+  pool: {
+    active_proxies: { size: number; ttl: number }
+    proxies_pool: { size: number; ttl: number }
+  }
+}
+
+export interface ProxyTaskResponse {
+  queued: boolean
+  task_id: string
+  message: string
 }
 
 export interface PaginatedResponse<T> {
@@ -364,6 +380,73 @@ export function useDeleteSchedule() {
     onSuccess: () => {
       toast.success('Agendamento removido')
       queryClient.invalidateQueries({ queryKey: ['schedule'] })
+    },
+  })
+}
+
+// ============================================================
+// PROXY CONTROL
+// ============================================================
+
+export function useProxySettings() {
+  return useQuery<ProxySettingsResponse>({
+    queryKey: ['proxy-settings'],
+    queryFn: async () => {
+      const { data } = await api.get<ProxySettingsResponse>('/api/v1/proxy/settings')
+      return data
+    },
+    refetchInterval: 10000,
+  })
+}
+
+export function useEnableProxy() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/v1/proxy/enable')
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Proxy global ativado')
+      queryClient.invalidateQueries({ queryKey: ['proxy-settings'] })
+    },
+  })
+}
+
+export function useDisableProxy() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/v1/proxy/disable')
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Proxy global desativado')
+      queryClient.invalidateQueries({ queryKey: ['proxy-settings'] })
+    },
+  })
+}
+
+export function useRefreshProxyPool() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<ProxyTaskResponse>('/api/v1/proxy/pool/refresh')
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Atualização do pool enfileirada')
+    },
+  })
+}
+
+export function useProxyHealthCheck() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<ProxyTaskResponse>('/api/v1/proxy/pool/health-check')
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Health check de proxies enfileirado')
     },
   })
 }

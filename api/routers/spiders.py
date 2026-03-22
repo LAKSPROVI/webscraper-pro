@@ -10,11 +10,9 @@ Endpoints:
     POST   /api/v1/spiders/{name}/validate      — Validar YAML da config
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Any, Annotated
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -66,7 +64,7 @@ router = APIRouter(
     """,
 )
 async def listar_spiders(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     include_inactive: Annotated[bool, Query(description="Incluir configurações desativas")] = False,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -131,7 +129,7 @@ async def listar_spiders(
 )
 async def criar_spider(
     request: CreateSpiderConfig,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> SpiderConfigResponse:
     """
     Cria uma nova configuração de spider.
@@ -196,7 +194,7 @@ async def criar_spider(
 )
 async def obter_spider(
     name: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> SpiderConfigResponse:
     """
     Retorna os detalhes completos de uma configuração de spider.
@@ -245,7 +243,7 @@ async def obter_spider(
 async def atualizar_spider(
     name: str,
     request: UpdateSpiderConfig,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> SpiderConfigResponse:
     """
     Atualiza uma configuração de spider existente.
@@ -338,7 +336,7 @@ async def atualizar_spider(
 )
 async def desativar_spider(
     name: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> None:
     """
     Desativa uma configuração de spider (soft delete).
@@ -391,7 +389,7 @@ async def desativar_spider(
 )
 async def validar_spider(
     name: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> SpiderValidationResponse:
     """
     Valida a configuração YAML de um spider.

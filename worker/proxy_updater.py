@@ -395,20 +395,23 @@ class ProxyUpdater:
         try:
             pipe = self.redis_client.pipeline()
 
-            # Remove o conjunto antigo e cria um novo (atomicamente)
+            # Remove os conjuntos antigos e recria ambos (compatibilidade)
             pipe.delete("active_proxies")
+            pipe.delete("proxies:pool")
 
             for proxy_data in valid_proxies:
                 proxy_str = f"{proxy_data['protocol']}://{proxy_data['host']}:{proxy_data['port']}"
                 pipe.sadd("active_proxies", proxy_str)
+                pipe.sadd("proxies:pool", proxy_str)
 
             # Expira em 2 horas (para garantir refresh)
             pipe.expire("active_proxies", 7200)
+            pipe.expire("proxies:pool", 7200)
 
             pipe.execute()
 
             logger.info(
-                "Redis atualizado: %d proxies no SET 'active_proxies'",
+                "Redis atualizado: %d proxies nos SETs 'active_proxies' e 'proxies:pool'",
                 len(valid_proxies),
             )
 

@@ -15,18 +15,19 @@ Para proxies autenticados: "http://usuario:senha@ip:porta"
 
 import logging
 import random
+import time
 from collections import defaultdict
 from typing import Optional
-from urllib.parse import urlparse
 
 import redis as redis_lib
-from scrapy.exceptions import NotConfigured
 from scrapy.http import Request, Response
 
 logger = logging.getLogger(__name__)
 
 # Chaves Redis para o pool de proxies
 REDIS_PROXY_POOL_KEY = "proxies:pool"           # SET com todos os proxies
+REDIS_PROXY_ACTIVE_KEY = "active_proxies"       # SET legado/worker updater
+REDIS_PROXY_ENABLED_KEY = "proxy:enabled"       # STRING bool (1/0)
 REDIS_PROXY_FAILURES_KEY = "proxies:failures:"  # HASH prefixo para contagem de falhas
 REDIS_PROXY_SUCCESSES_KEY = "proxies:successes:" # HASH prefixo para contagem de sucessos
 
@@ -44,6 +45,10 @@ class ProxyMiddleware:
 
     def __init__(self, settings):
         self.settings = settings
+        self._enabled_default = bool(settings.getbool("PROXY_ENABLED", False))
+        self._enabled_cache = self._enabled_default
+        self._enabled_cache_at = 0.0
+        self._enabled_cache_ttl = 10.0
         # Taxa máxima de falha antes de excluir o proxy (30%)
         self.max_failure_rate = 0.30
         # Mínimo de requisições antes de calcular taxa de falha
@@ -79,12 +84,41 @@ class ProxyMiddleware:
         if not self._redis:
             return
         try:
-            proxies = self._redis.smembers(REDIS_PROXY_POOL_KEY)
+            proxies = self._redis.smembers(REDIS_PROXY_ACTIVE_KEY)
+            if not proxies:
+                proxies = self._redis.smembers(REDIS_PROXY_POOL_KEY)
             self._proxy_pool = list(proxies) if proxies else []
             logger.info(f"Carregados {len(self._proxy_pool)} proxies do Redis")
         except Exception as e:
             logger.error(f"Erro ao carregar proxies do Redis: {e}")
             self._proxy_pool = []
+
+    @staticmethod
+    def _coerce_bool(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+    def _is_proxy_globally_enabled(self) -> bool:
+        """Verifica chave global de ativação com cache curto para reduzir I/O."""
+        agora = time.time()
+        if agora - self._enabled_cache_at < self._enabled_cache_ttl:
+            return self._enabled_cache
+
+        enabled = self._enabled_default
+        if self._redis:
+            try:
+                raw = self._redis.get(REDIS_PROXY_ENABLED_KEY)
+                if raw is not None:
+                    enabled = self._coerce_bool(raw)
+            except Exception as exc:
+                logger.debug("Falha ao ler toggle global de proxy no Redis: %s", exc)
+
+        self._enabled_cache = enabled
+        self._enabled_cache_at = agora
+        return enabled
 
     def _get_next_proxy(self) -> Optional[str]:
         """
@@ -148,6 +182,7 @@ class ProxyMiddleware:
         if self._redis:
             try:
                 self._redis.srem(REDIS_PROXY_POOL_KEY, proxy)
+                self._redis.srem(REDIS_PROXY_ACTIVE_KEY, proxy)
                 logger.info(f"Proxy removido do pool Redis: {proxy[:30]}...")
             except Exception as e:
                 logger.error(f"Erro ao remover proxy do Redis: {e}")
@@ -162,6 +197,16 @@ class ProxyMiddleware:
         """
         # Verifica se a spider quer ignorar proxy
         if request.meta.get("dont_use_proxy", False):
+            return
+
+        spider_use_proxy = getattr(spider, "use_proxy", None)
+        if spider_use_proxy is False:
+            return
+
+        force_proxy = request.meta.get("force_use_proxy")
+        if force_proxy is None and spider_use_proxy is None and not self._is_proxy_globally_enabled():
+            return
+        if force_proxy is False:
             return
 
         # Recarrega proxies do Redis periodicamente (a cada 100 requests)

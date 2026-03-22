@@ -2,12 +2,22 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bug, Play, Edit2, Trash2, Copy, Power, Clock, Activity,
-  Plus, X, CheckCircle, AlertCircle
+  Plus, X, CheckCircle, AlertCircle, ShieldCheck, ShieldOff, RefreshCcw, HeartPulse
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import clsx from 'clsx'
-import { useSpiders, useCreateSpider, useUpdateSpider, useDeleteSpider } from '../hooks/useApi'
+import {
+  useSpiders,
+  useCreateSpider,
+  useUpdateSpider,
+  useDeleteSpider,
+  useProxySettings,
+  useEnableProxy,
+  useDisableProxy,
+  useRefreshProxyPool,
+  useProxyHealthCheck,
+} from '../hooks/useApi'
 import type { SpiderConfig } from '../hooks/useApi'
 import GlowCard from '../components/ui/GlowCard'
 import NeonButton from '../components/ui/NeonButton'
@@ -247,6 +257,7 @@ function SpiderCard({ spider }: { spider: SpiderConfig }) {
   const colors = typeColors[spider.type] || typeColors.generic
   const { mutate: update } = useUpdateSpider()
   const { mutate: del } = useDeleteSpider()
+  const { mutate: createSpider } = useCreateSpider()
   const { mutate: scrape } = useScrape()
   const [showEditor, setShowEditor] = useState(false)
 
@@ -329,7 +340,14 @@ function SpiderCard({ spider }: { spider: SpiderConfig }) {
             <Edit2 size={13} />
           </button>
           <button
-            onClick={() => update({ id: spider.id })}
+            onClick={() => createSpider({
+              name: `${spider.name}-copy-${Date.now().toString().slice(-4)}`,
+              type: spider.type,
+              description: spider.description,
+              is_active: spider.is_active,
+              config_yaml: spider.config_yaml,
+              last_used: undefined,
+            })}
             className="p-1.5 rounded-lg border border-border-dim text-text-muted hover:border-neon-purple-mid hover:text-purple-300 transition-all"
             title="Duplicar"
           >
@@ -360,6 +378,11 @@ function SpiderCard({ spider }: { spider: SpiderConfig }) {
 
 export default function Spiders() {
   const { data, isLoading } = useSpiders()
+  const { data: proxySettings, refetch: refetchProxy } = useProxySettings()
+  const { mutate: enableProxy, isPending: enablingProxy } = useEnableProxy()
+  const { mutate: disableProxy, isPending: disablingProxy } = useDisableProxy()
+  const { mutate: refreshPool, isPending: refreshingPool } = useRefreshProxyPool()
+  const { mutate: healthCheck, isPending: healthChecking } = useProxyHealthCheck()
   const [showNewModal, setShowNewModal] = useState(false)
   const { mutate: create } = useCreateSpider()
 
@@ -367,6 +390,72 @@ export default function Spiders() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <GlowCard color="purple" className="p-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-text-primary font-semibold text-sm">Controle de Proxy</p>
+              <p className="text-text-muted text-xs font-mono">
+                Status global: {proxySettings?.enabled ? 'ATIVO' : 'INATIVO'} | Pool ativo: {proxySettings?.pool.active_proxies.size ?? 0} | Pool legado: {proxySettings?.pool.proxies_pool.size ?? 0}
+              </p>
+            </div>
+            <div className={clsx(
+              'px-2 py-1 rounded-lg text-xs font-mono border',
+              proxySettings?.enabled
+                ? 'text-neon-green border-neon-green-dim bg-neon-green-dim'
+                : 'text-text-muted border-border-dim bg-bg-surface'
+            )}>
+              {proxySettings?.enabled ? 'PROXY ON' : 'PROXY OFF'}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <NeonButton
+              size="sm"
+              variant="primary"
+              icon={<ShieldCheck size={12} />}
+              loading={enablingProxy}
+              onClick={() => enableProxy()}
+            >
+              Ativar Proxy
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="ghost"
+              icon={<ShieldOff size={12} />}
+              loading={disablingProxy}
+              onClick={() => disableProxy()}
+            >
+              Desativar Proxy
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="ghost"
+              icon={<RefreshCcw size={12} />}
+              loading={refreshingPool}
+              onClick={() => refreshPool()}
+            >
+              Atualizar Pool
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="ghost"
+              icon={<HeartPulse size={12} />}
+              loading={healthChecking}
+              onClick={() => healthCheck()}
+            >
+              Health Check
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="ghost"
+              onClick={() => refetchProxy()}
+            >
+              Recarregar Status
+            </NeonButton>
+          </div>
+        </div>
+      </GlowCard>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

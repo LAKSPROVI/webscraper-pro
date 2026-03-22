@@ -73,6 +73,7 @@ def send_scrape_task(
     config_name: Optional[str] = None,
     spider_type: str = "generic",
     render_js: bool = False,
+    use_proxy: Optional[bool] = None,
     crawl_depth: int = 1,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
@@ -104,6 +105,7 @@ def send_scrape_task(
             "config_name": config_name,
             "spider_type": spider_type,
             "render_js": render_js,
+            "use_proxy": use_proxy,
             "crawl_depth": crawl_depth,
             "metadata": metadata or {},
         },
@@ -130,6 +132,7 @@ def send_bulk_scrape_task(
     config_name: Optional[str] = None,
     spider_type: str = "generic",
     render_js: bool = False,
+    use_proxy: Optional[bool] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> list[str]:
     """
@@ -155,6 +158,7 @@ def send_bulk_scrape_task(
             config_name=config_name,
             spider_type=spider_type,
             render_js=render_js,
+            use_proxy=use_proxy,
             crawl_depth=1,
             metadata=metadata,
         )
@@ -246,3 +250,29 @@ def get_task_status(task_id: str) -> Dict[str, Any]:
             "progress": 0,
             "error": str(exc),
         }
+
+
+def send_update_proxy_pool_task() -> str:
+    """Dispara atualização do pool de proxies no worker."""
+    result = celery_client.send_task(
+        "worker.tasks.update_proxy_pool",
+        args=[],
+        kwargs={},
+        queue="proxy_update",
+        priority=5,
+    )
+    logger.info("Task update_proxy_pool enviada: task_id=%s", result.id)
+    return result.id
+
+
+def send_proxy_health_check_task() -> str:
+    """Dispara checagem de saúde dos proxies no worker."""
+    result = celery_client.send_task(
+        "worker.tasks.health_check_proxies",
+        args=[],
+        kwargs={},
+        queue="proxy_update",
+        priority=5,
+    )
+    logger.info("Task health_check_proxies enviada: task_id=%s", result.id)
+    return result.id

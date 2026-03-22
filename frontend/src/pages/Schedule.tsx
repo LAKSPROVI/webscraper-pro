@@ -2,12 +2,13 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, Plus, Power, Trash2, Edit2, Clock,
-  CheckCircle2, XCircle, X, ChevronDown,
+  CheckCircle2, XCircle, X, ChevronDown, Play,
 } from 'lucide-react'
 import { format, formatDistanceToNow, addMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import clsx from 'clsx'
 import { useSchedule, useCreateSchedule, useUpdateSchedule, useDeleteSchedule } from '../hooks/useApi'
+import { useScrape } from '../hooks/useApi'
 import type { ScheduleEntry } from '../hooks/useApi'
 import GlowCard from '../components/ui/GlowCard'
 import NeonButton from '../components/ui/NeonButton'
@@ -277,6 +278,7 @@ function NewScheduleModal({ onClose, onCreate }: {
 function ScheduleCard({ schedule }: { schedule: ScheduleEntry }) {
   const { mutate: update } = useUpdateSchedule()
   const { mutate: del } = useDeleteSchedule()
+  const { mutate: runNow, isPending: runningNow } = useScrape()
 
   const nextRunDist = schedule.next_run
     ? formatDistanceToNow(new Date(schedule.next_run), { addSuffix: true, locale: ptBR })
@@ -347,6 +349,15 @@ function ScheduleCard({ schedule }: { schedule: ScheduleEntry }) {
 
       {/* Ações */}
       <div className="flex items-center gap-2 pt-3 border-t border-border-dim">
+        <NeonButton
+          size="sm"
+          variant="ghost"
+          loading={runningNow}
+          icon={<Play size={11} />}
+          onClick={() => runNow({ url: schedule.target_url, spider_type: schedule.spider_type, crawl_depth: 1 })}
+        >
+          Executar agora
+        </NeonButton>
         <button
           onClick={() => del(schedule.id)}
           className="ml-auto p-1.5 rounded-lg border border-border-dim text-text-muted hover:border-neon-red-dim hover:text-neon-red transition-all"

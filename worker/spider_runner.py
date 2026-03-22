@@ -75,6 +75,7 @@ class SpiderRunner:
         spider_type: str,
         config: dict[str, Any],
         render_js: bool = False,
+        use_proxy: bool | None = None,
         crawl_depth: int = 1,
         timeout: int = SPIDER_DEFAULT_TIMEOUT,
     ) -> int:
@@ -127,6 +128,7 @@ class SpiderRunner:
                 spider_type=spider_type,
                 config=config,
                 render_js=render_js,
+                use_proxy=use_proxy,
                 crawl_depth=crawl_depth,
                 resultado=resultado,
             )
@@ -167,6 +169,7 @@ class SpiderRunner:
         spider_type: str,
         config: dict[str, Any],
         render_js: bool,
+        use_proxy: bool | None,
         crawl_depth: int,
         resultado: dict[str, Any],
     ) -> None:
@@ -271,6 +274,9 @@ class SpiderRunner:
                 "progress_callback": publicar_progresso,
                 "progress_interval": PROGRESS_PUBLISH_INTERVAL,
             }
+
+            if use_proxy is not None:
+                spider_kwargs["use_proxy"] = bool(use_proxy)
 
             # Injeta configurações específicas do tipo
             if spider_type == "generic":

@@ -37,7 +37,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from database.connection import check_db, close_db, init_db
 from middleware import PrometheusMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
 from rate_limiter import limiter
-from routers import auth, data, jobs, schedule, scrape, spiders
+from routers import auth, data, jobs, proxy, schedule, scrape, spiders
 
 # ---------------------------------------------------------------------------
 # Configuração de Logging
@@ -332,6 +332,9 @@ app.include_router(data.router)
 
 # Router de configurações de spiders
 app.include_router(spiders.router)
+
+# Router de controle de proxy
+app.include_router(proxy.router)
 
 # Router de agendamentos CRON
 app.include_router(schedule.router)

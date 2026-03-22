@@ -9,15 +9,13 @@ Endpoints:
     DELETE /api/v1/data/item/{item_id}  — Deletar item específico
 """
 
-from __future__ import annotations
-
 import csv
 import hashlib
 import io
 import logging
 import time
 from datetime import datetime
-from typing import Annotated, AsyncGenerator, Literal, Optional
+from typing import Any, Annotated, AsyncGenerator, Literal, Optional
 
 import orjson
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -69,7 +67,7 @@ router = APIRouter(
 @limiter.limit("90/minute")
 async def buscar_dados(
     request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     q: Annotated[str, Query(min_length=2, description="Termo de busca (mínimo 2 caracteres)")],
     domain: Annotated[Optional[str], Query(description="Filtrar por domínio (ex: tjsp.jus.br)")] = None,
     spider_type: Annotated[Optional[str], Query(description="Filtrar por tipo de spider")] = None,
@@ -176,7 +174,7 @@ async def buscar_dados(
 async def obter_item(
     request: Request,
     item_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> ItemResponse:
     """
     Retorna os dados completos de um item coletado.
@@ -225,7 +223,7 @@ async def obter_item(
 async def listar_dominios(
     request: Request,
     response: Response,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=200, description="Máximo de domínios")] = 50,
 ) -> list[DomainStats]:
     """
@@ -384,7 +382,7 @@ async def _gerar_csv_stream(
 async def exportar_dados(
     request: Request,
     format: Literal["json", "csv"],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
     job_id: Annotated[Optional[int], Query(description="Filtrar por job")] = None,
     domain: Annotated[Optional[str], Query(description="Filtrar por domínio")] = None,
     date_from: Annotated[Optional[datetime], Query(description="Data inicial")] = None,
@@ -489,7 +487,7 @@ async def exportar_dados(
 async def deletar_item(
     request: Request,
     item_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> None:
     """
     Deleta permanentemente um item coletado.

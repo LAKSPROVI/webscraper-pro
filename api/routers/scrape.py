@@ -10,11 +10,9 @@ Todos os endpoints são assíncronos e integram com Celery para
 processamento em background.
 """
 
-from __future__ import annotations
-
 import logging
 import time
-from typing import Annotated
+from typing import Any, Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -71,7 +69,7 @@ router = APIRouter(
 async def criar_scrape(
     request: Request,
     payload: ScrapeRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> JobCreatedResponse:
     """
     Dispara um scraping imediato de uma URL.
@@ -88,6 +86,10 @@ async def criar_scrape(
         HTTPException 500: Se houver erro ao criar o job ou enviar para o broker.
     """
     try:
+        metadata = dict(payload.metadata or {})
+        if payload.use_proxy is not None:
+            metadata["use_proxy"] = payload.use_proxy
+
         # Cria o registro do job no banco de dados
         job = await create_job(
             db,
@@ -96,7 +98,7 @@ async def criar_scrape(
             spider_type=payload.spider_type,
             render_js=payload.render_js,
             crawl_depth=payload.crawl_depth,
-            metadata=payload.metadata if payload.metadata else None,
+            metadata=metadata if metadata else None,
         )
 
         # Envia a task para o broker Celery
@@ -106,8 +108,9 @@ async def criar_scrape(
             config_name=payload.config_name,
             spider_type=payload.spider_type,
             render_js=payload.render_js,
+            use_proxy=payload.use_proxy,
             crawl_depth=payload.crawl_depth,
-            metadata=payload.metadata,
+            metadata=metadata,
         )
 
         logger.info(
@@ -170,7 +173,7 @@ async def criar_scrape(
 async def criar_bulk_scrape(
     request: Request,
     payload: BulkScrapeRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: Annotated[Any, Depends(get_db)],
 ) -> BulkJobCreatedResponse:
     """
     Dispara scraping de múltiplas URLs em lote.
@@ -187,6 +190,10 @@ async def criar_bulk_scrape(
         HTTPException 500: Se houver erro ao criar os jobs.
     """
     try:
+        metadata = dict(payload.metadata or {})
+        if payload.use_proxy is not None:
+            metadata["use_proxy"] = payload.use_proxy
+
         job_ids: list[int] = []
 
         # Cria um job para cada URL
@@ -198,7 +205,7 @@ async def criar_bulk_scrape(
                 spider_type=payload.spider_type,
                 render_js=payload.render_js,
                 crawl_depth=1,
-                metadata=payload.metadata if payload.metadata else None,
+                metadata=metadata if metadata else None,
             )
             job_ids.append(job.id)
 
@@ -209,7 +216,8 @@ async def criar_bulk_scrape(
             config_name=payload.config_name,
             spider_type=payload.spider_type,
             render_js=payload.render_js,
-            metadata=payload.metadata,
+            use_proxy=payload.use_proxy,
+            metadata=metadata,
         )
 
         logger.info(

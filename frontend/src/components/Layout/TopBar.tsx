@@ -24,6 +24,7 @@ function NewScrapeModal({ onClose }: NewScrapeModalProps) {
   const [url, setUrl] = useState('')
   const [spiderType, setSpiderType] = useState('generic')
   const [renderJs, setRenderJs] = useState(false)
+  const [useProxy, setUseProxy] = useState(false)
   const [crawlDepth, setCrawlDepth] = useState(1)
   const [urlError, setUrlError] = useState('')
 
@@ -43,7 +44,13 @@ function NewScrapeModal({ onClose }: NewScrapeModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateUrl(url)) return
-    scrape({ url, spider_type: spiderType, render_js: renderJs, crawl_depth: crawlDepth }, {
+    scrape({
+      url,
+      spider_type: spiderType,
+      render_js: renderJs,
+      use_proxy: useProxy,
+      crawl_depth: crawlDepth,
+    }, {
       onSuccess: () => onClose(),
     })
   }
@@ -131,7 +138,7 @@ function NewScrapeModal({ onClose }: NewScrapeModalProps) {
             </div>
 
             {/* Opções */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {/* Render JS */}
               <div>
                 <label className="block text-text-secondary text-xs font-medium mb-2 font-mono">
@@ -151,6 +158,28 @@ function NewScrapeModal({ onClose }: NewScrapeModalProps) {
                     {renderJs && <span className="text-bg-base text-xs">✓</span>}
                   </div>
                   {renderJs ? 'Ativado' : 'Desativado'}
+                </button>
+              </div>
+
+              {/* Use Proxy */}
+              <div>
+                <label className="block text-text-secondary text-xs font-medium mb-2 font-mono">
+                  USAR PROXY
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setUseProxy(!useProxy)}
+                  className={clsx(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono transition-all duration-200 w-full',
+                    useProxy
+                      ? 'border-neon-purple-mid bg-neon-purple-dim text-neon-purple'
+                      : 'border-border-dim bg-bg-card text-text-muted'
+                  )}
+                >
+                  <div className={clsx('w-4 h-4 rounded border flex items-center justify-center', useProxy ? 'border-neon-purple bg-neon-purple' : 'border-border-mid')}>
+                    {useProxy && <span className="text-bg-base text-xs">✓</span>}
+                  </div>
+                  {useProxy ? 'Ativado' : 'Desativado'}
                 </button>
               </div>
 
