@@ -58,8 +58,8 @@ class ScrapeRequest(BaseModel):
     )
     spider_type: str = Field(
         default="generic",
-        description="Tipo do spider: generic, scrapy, playwright",
-        examples=["generic", "scrapy", "playwright"],
+        description="Tipo do spider: generic, scrapy, playwright, jusbrasil",
+        examples=["generic", "scrapy", "playwright", "jusbrasil"],
     )
     render_js: bool = Field(
         default=False,
@@ -92,7 +92,7 @@ class ScrapeRequest(BaseModel):
     @classmethod
     def validar_spider_type(cls, v: str) -> str:
         """Valida que o tipo de spider é suportado."""
-        tipos_validos = {"generic", "scrapy", "playwright", "requests"}
+        tipos_validos = {"generic", "scrapy", "playwright", "requests", "jusbrasil"}
         if v not in tipos_validos:
             raise ValueError(f"Tipo de spider inválido. Use um de: {tipos_validos}")
         return v

@@ -295,6 +295,7 @@ class SpiderRunner:
         """
         mapeamento: dict[str, str] = {
             "generic":  "scraper.spiders.generic_spider.GenericSpider",
+            "jusbrasil": "scraper.spiders.jusbrasil_spider.JusbrasilSpider",
             "js":       "scraper.spiders.js_spider.JSSpider",
             "rss":      "scraper.spiders.rss_spider.RSSSpider",
             "api":      "scraper.spiders.api_spider.APISpider",
