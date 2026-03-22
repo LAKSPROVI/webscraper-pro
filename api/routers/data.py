@@ -30,7 +30,7 @@ from models.schemas import (
     ItemResponse,
     SearchResponse,
 )
-from rate_limiter import limiter
+from api.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 

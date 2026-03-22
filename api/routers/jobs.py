@@ -37,7 +37,7 @@ from models.schemas import (
     JobResponse,
     PaginatedResponse,
 )
-from rate_limiter import limiter
+from api.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 

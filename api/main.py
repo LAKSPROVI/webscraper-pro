@@ -34,10 +34,10 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from api.middleware import PrometheusMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
+from api.rate_limiter import limiter
+from api.routers import auth, data, jobs, proxy, schedule, scrape, spiders
 from database.connection import check_db, close_db, init_db
-from middleware import PrometheusMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware
-from rate_limiter import limiter
-from routers import auth, data, jobs, proxy, schedule, scrape, spiders
 
 # ---------------------------------------------------------------------------
 # Configuração de Logging
