@@ -318,7 +318,7 @@ class StoragePipeline:
         - completed_at: timestamp de conclusão
         """
         async with get_session() as session:
-            from sqlalchemy import select, update
+            from sqlalchemy import func, select
 
             # Busca o job para atualização
             stmt = select(ScrapingJob).where(ScrapingJob.id == job_id)
@@ -326,7 +326,11 @@ class StoragePipeline:
             job = result.scalar_one_or_none()
 
             if job:
-                job.items_scraped = self._saved_count
+                count_stmt = select(func.count(ScrapedItemModel.id)).where(ScrapedItemModel.job_id == job_id)
+                count_result = await session.execute(count_stmt)
+                persisted_count = int(count_result.scalar() or 0)
+
+                job.items_scraped = persisted_count
                 job.completed_at = datetime.now(timezone.utc)
                 # Só marca como 'done' se estava 'running'
                 if job.status == "running":
@@ -334,7 +338,7 @@ class StoragePipeline:
                 await session.commit()
                 logger.info(
                     f"Job {job_id} atualizado: "
-                    f"{self._saved_count} itens, status={job.status}"
+                    f"{persisted_count} itens, status={job.status}"
                 )
             else:
                 logger.warning(f"Job {job_id} não encontrado no banco para atualização")
