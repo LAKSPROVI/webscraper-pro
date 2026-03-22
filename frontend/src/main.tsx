@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import App from './App.tsx'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -17,33 +18,35 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: '#0a0e1a',
-            color: '#e2e8f0',
-            border: '1px solid rgba(0,212,255,0.3)',
-            borderRadius: '8px',
-            fontFamily: '"Inter", sans-serif',
-            fontSize: '14px',
-          },
-          success: {
-            iconTheme: {
-              primary: '#00ff88',
-              secondary: '#0a0e1a',
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#0a0e1a',
+              color: '#e2e8f0',
+              border: '1px solid rgba(0,212,255,0.3)',
+              borderRadius: '8px',
+              fontFamily: '"Inter", sans-serif',
+              fontSize: '14px',
             },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ff3366',
-              secondary: '#0a0e1a',
+            success: {
+              iconTheme: {
+                primary: '#00ff88',
+                secondary: '#0a0e1a',
+              },
             },
-          },
-        }}
-      />
-    </QueryClientProvider>
+            error: {
+              iconTheme: {
+                primary: '#ff3366',
+                secondary: '#0a0e1a',
+              },
+            },
+          }}
+        />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 )

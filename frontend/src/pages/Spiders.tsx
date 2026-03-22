@@ -406,7 +406,6 @@ export default function Spiders() {
               is_active: true,
               config_yaml: config.config_yaml || DEFAULT_YAML,
               last_used: undefined,
-              total_runs: 0,
             })}
           />
         )}
