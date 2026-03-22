@@ -22,14 +22,14 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webscraper.database.connection import get_db
-from webscraper.database.models import SpiderConfig
-from webscraper.database.queries import (
+from database.connection import get_db
+from database.models import SpiderConfig
+from database.queries import (
     create_spider_config,
     get_spider_config,
     list_spider_configs,
 )
-from webscraper.api.models.schemas import (
+from models.schemas import (
     CreateSpiderConfig,
     PaginatedResponse,
     SpiderConfigResponse,

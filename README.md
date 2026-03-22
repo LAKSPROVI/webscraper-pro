@@ -622,6 +622,93 @@ webscraper/
 
 ---
 
+## 🔐 Hardening e Segurança
+
+O backend agora inclui um conjunto de proteções ativas por padrão:
+
+- `Rate limiting` global e por endpoint com `slowapi`
+- `Security headers` em todas as respostas
+- `TrustedHostMiddleware` para controlar hosts válidos
+- `GZipMiddleware` para reduzir payload em respostas maiores
+- `Cache-Control` explícito para endpoints de leitura e exportação
+
+Variáveis úteis de segurança:
+
+```bash
+# Hosts permitidos (separados por vírgula)
+API_ALLOWED_HOSTS=localhost,127.0.0.1,api.seu-dominio.com
+
+# Rate limiting já ativo por default (200/min global)
+# Limites específicos são definidos por rota
+```
+
+---
+
+## ✅ CI/CD
+
+Pipeline configurado em [.github/workflows/ci.yml](.github/workflows/ci.yml):
+
+- Backend:
+  - Instala dependências de `api`, `worker`, `scraper`
+  - Lint com Ruff
+  - Type-check com mypy
+  - Testes com pytest
+- Frontend:
+  - `npm ci`
+  - Type-check (`tsc --noEmit`)
+  - Build de produção (`vite build`)
+
+---
+
+## 🧰 Operação
+
+Scripts operacionais úteis:
+
+- [scripts/backup.sh](scripts/backup.sh): backup PostgreSQL com retenção
+- [scripts/update.sh](scripts/update.sh): atualização com rollback
+- [scripts/healthcheck.sh](scripts/healthcheck.sh): verificação rápida da stack
+
+Exemplo:
+
+```bash
+bash scripts/healthcheck.sh
+```
+
+---
+
+## ☸️ Kubernetes (base)
+
+Manifests iniciais em [k8s/api-deployment.yaml](k8s/api-deployment.yaml) e [k8s/worker-deployment.yaml](k8s/worker-deployment.yaml).
+
+Aplicação de exemplo:
+
+```bash
+kubectl apply -f k8s/api-deployment.yaml
+kubectl apply -f k8s/worker-deployment.yaml
+```
+
+---
+
+## 🧪 Frontend QA
+
+Ferramentas adicionadas no frontend:
+
+- Error Boundary global para evitar crash total da SPA
+- Vitest + Testing Library para testes de componentes
+- ESLint para qualidade de código
+- Storybook para documentação visual de componentes
+
+Comandos:
+
+```bash
+cd frontend
+npm run lint
+npm run test
+npm run storybook
+```
+
+---
+
 ## 🤝 Contribuição
 
 1. Fork o repositório

@@ -18,6 +18,10 @@ import os
 from celery import Celery
 from kombu import Exchange, Queue
 
+from .logging_config import setup_worker_logging
+
+setup_worker_logging()
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------

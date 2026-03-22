@@ -98,6 +98,8 @@ services:
     volumes:
       # Hot-reload em desenvolvimento (remover em produção)
       - ./api:/app:cached
+      # Módulo de banco de dados compartilhado
+      - ./database:/app/database:cached
       # Logs persistentes
       - api_logs:/app/logs
     networks:
@@ -133,6 +135,7 @@ services:
       CELERY_WORKER_MAX_TASKS_PER_CHILD: "100"
     volumes:
       - ./worker:/app:cached
+      - ./database:/app/database:cached
       - worker_logs:/app/logs
       # Cache do Playwright para evitar re-download do browser
       - playwright_cache:/root/.cache/ms-playwright
@@ -145,13 +148,13 @@ services:
         condition: service_healthy
     # Celery worker — verifica se o processo está ativo
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      test: ["CMD-SHELL", "celery -A worker.celery_config inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 3
       start_period: 60s
     command: >
-      celery -A app.celery_app worker
+      celery -A worker.celery_config worker
       --loglevel=${LOG_LEVEL:-info}
       --concurrency=4
       --max-tasks-per-child=100
@@ -173,6 +176,7 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
     volumes:
       - ./worker:/app:cached
+      - ./database:/app/database:cached
       - beat_schedule:/app/celerybeat
       - worker_logs:/app/logs
     networks:
@@ -190,9 +194,9 @@ services:
       retries: 3
       start_period: 30s
     command: >
-      celery -A app.celery_app beat
+      celery -A worker.celery_config beat
       --loglevel=${LOG_LEVEL:-info}
-      --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+      --scheduler=celery.beat:PersistentScheduler
       --pidfile=/app/celerybeat/celerybeat.pid
       --schedule=/app/celerybeat/celerybeat-schedule
 
@@ -226,11 +230,11 @@ services:
       retries: 3
       start_period: 20s
     command: >
-      celery -A app.celery_app flower
+      celery -A worker.celery_config flower
       --port=${FLOWER_PORT:-5555}
       --broker=${CELERY_BROKER_URL:-redis://redis:6379/0}
       --loglevel=${LOG_LEVEL:-info}
-      --persistent=true
+      --persistent=True
       --db=/tmp/flower.db
 
   # ---------------------------------------------------------------------------
@@ -346,6 +350,32 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # FRONTEND — Dashboard React/Vite
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_WS_URL: ws://localhost:8000
+    container_name: scraper-frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    networks:
+      - scraper-net
+    depends_on:
+      scraper-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # ---------------------------------------------------------------------------
   # ADMIN POSTGRESQL — pgAdmin 4.8

@@ -2,6 +2,9 @@
   "name": "🕷️ WebScraper Pro — Dev Environment",
   "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
 
+  // Habilita Docker privilegiado (necessário para Docker-in-Docker no Codespace)
+  "runArgs": ["--privileged", "--security-opt", "seccomp=unconfined"],
+
   // Serviços Docker disponíveis no Codespace via Docker-in-Docker
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
@@ -18,6 +21,7 @@
   // Portas expostas pelo Codespace
   "forwardPorts": [
     8000,
+    3001,
     3000,
     5555,
     5432,

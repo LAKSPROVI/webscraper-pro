@@ -7,11 +7,11 @@
 # Variáveis configuráveis via linha de comando
 COMPOSE_FILE   := docker-compose.yml
 PROJECT_NAME   := webscraper
-API_SERVICE    := api
-WORKER_SERVICE := worker
+API_SERVICE    := scraper-api
+WORKER_SERVICE := scraper-worker
 DB_SERVICE     := postgres
-DB_NAME        := webscraper_db
-DB_USER        := webscraper_user
+DB_NAME        := webscraper
+DB_USER        := scraper
 
 # Cores para output no terminal
 VERDE  := \033[0;32m

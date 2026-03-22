@@ -28,6 +28,9 @@ from celery.exceptions import SoftTimeLimitExceeded, MaxRetriesExceededError
 
 from .celery_config import app
 from .events import get_publisher
+from .logging_config import setup_worker_logging
+
+setup_worker_logging()
 
 logger = logging.getLogger(__name__)
 

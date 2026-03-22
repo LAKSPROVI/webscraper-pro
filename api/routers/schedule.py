@@ -19,13 +19,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webscraper.database.connection import get_db
-from webscraper.database.models import ScheduledJob
-from webscraper.database.queries import (
+from database.connection import get_db
+from database.models import ScheduledJob
+from database.queries import (
     create_scheduled_job,
     get_spider_config,
 )
-from webscraper.api.models.schemas import (
+from models.schemas import (
     CreateScheduledJob,
     PaginatedResponse,
     ScheduledJobResponse,

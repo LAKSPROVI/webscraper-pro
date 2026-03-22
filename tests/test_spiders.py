@@ -241,10 +241,23 @@ class ProxyUpdater:
     def validar_proxy(self, proxy: str) -> bool:
         """Valida se o proxy está no formato correto."""
         proxy = proxy.strip()
-        return bool(
-            self.PROXY_PATTERN_COMPLETO.match(proxy)
-            or self.PROXY_PATTERN_SIMPLES.match(proxy)
-        )
+        if not proxy:
+            return False
+
+        match_completo = self.PROXY_PATTERN_COMPLETO.match(proxy)
+        match_simples = self.PROXY_PATTERN_SIMPLES.match(proxy)
+        if not match_completo and not match_simples:
+            return False
+
+        try:
+            if match_completo:
+                port = int(match_completo.group(3))
+            else:
+                port = int(match_simples.group(2))
+        except (TypeError, ValueError):
+            return False
+
+        return 1 <= port <= 65535
 
     def adicionar_proxy(self, proxy: str) -> bool:
         """Adiciona proxy se válido. Retorna True se adicionado."""

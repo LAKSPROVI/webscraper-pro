@@ -148,11 +148,11 @@ EXPOSE 5555
 # Healthcheck para o worker Celery
 # Usa 'celery inspect ping' para verificar se o worker está respondendo
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
-    CMD celery -A app.celery_app inspect ping -d "celery@$HOSTNAME" || exit 1
+    CMD celery -A worker.celery_config inspect ping -d "celery@$HOSTNAME" || exit 1
 
 # Comando padrão: inicia o worker Celery
 # Pode ser sobrescrito no docker-compose para beat ou flower
-CMD ["celery", "-A", "app.celery_app", "worker", \
+CMD ["celery", "-A", "worker.celery_config", "worker", \
      "--loglevel=info", \
      "--concurrency=4", \
      "--queues=default,scraping,high_priority", \
