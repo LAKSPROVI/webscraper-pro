@@ -130,6 +130,7 @@ function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => voi
   const { mutate: retry, isPending: retrying } = useRetryJob()
 
   const isRunning = job.status === 'RUNNING'
+  const hasOperatorAction = Boolean(job.metadata?.operator_action?.required)
   const domain = (() => {
     try { return new URL(job.url).hostname } catch { return job.url }
   })()
@@ -181,7 +182,18 @@ function JobRow({ job, onViewItems }: { job: Job; onViewItems: (job: Job) => voi
       {/* Status */}
       <td className="px-4 py-3">
         <div className="flex flex-col gap-1">
-          <StatusBadge status={job.status} size="sm" />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={job.status} size="sm" />
+            {hasOperatorAction && (
+              <span
+                className="inline-flex items-center justify-center rounded-full border border-neon-amber-dim bg-neon-amber-dim p-1"
+                title="Ação manual do operador pendente para este job"
+                aria-label="Ação manual do operador pendente"
+              >
+                <AlertTriangle size={11} className="text-neon-amber" />
+              </span>
+            )}
+          </div>
           {isRunning && job.progress !== undefined && (
             <ProgressBar value={job.progress} size="xs" color="cyan" className="w-20" />
           )}
