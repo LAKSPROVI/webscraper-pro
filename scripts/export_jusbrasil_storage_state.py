@@ -70,6 +70,16 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Senha do proxy (opcional)",
     )
+    parser.add_argument(
+        "--seed-state",
+        default="",
+        help="Arquivo storage state existente para carregar antes da navegacao",
+    )
+    parser.add_argument(
+        "--refresh-only",
+        action="store_true",
+        help="Nao interativo: carrega seed-state, navega e salva novo state",
+    )
     return parser.parse_args()
 
 
@@ -178,16 +188,23 @@ def main() -> int:
     output_path = Path(args.output).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     proxy_config = _build_proxy_config(args)
+    seed_state_path = Path(args.seed_state).expanduser().resolve() if args.seed_state else None
 
     print("Abrindo navegador para login manual no Jusbrasil...")
     if proxy_config:
         print(f"Usando proxy fixo para exportacao: {proxy_config['server']}")
+    if args.refresh_only and seed_state_path is None:
+        raise ValueError("--refresh-only exige --seed-state")
+    if seed_state_path is not None and not seed_state_path.exists():
+        raise FileNotFoundError(f"seed-state nao encontrado: {seed_state_path}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=args.headless)
         context_kwargs: dict[str, Any] = {"locale": "pt-BR"}
         if proxy_config:
             context_kwargs["proxy"] = proxy_config
+        if seed_state_path is not None:
+            context_kwargs["storage_state"] = str(seed_state_path)
         context = browser.new_context(**context_kwargs)
         page = context.new_page()
 
@@ -198,7 +215,11 @@ def main() -> int:
             if args.auto_login:
                 auto_done = _try_auto_login(page, args.timeout)
 
-            if not auto_done:
+            if args.refresh_only:
+                print("Modo refresh-only ativo: sem interacao manual.")
+                if args.timeout > 0:
+                    page.wait_for_timeout(min(args.timeout, 15000))
+            elif not auto_done:
                 print("\nFaca login manualmente no navegador aberto.")
                 print("Depois de concluir login e abrir uma pagina autenticada, volte ao terminal.")
                 input("Pressione ENTER para continuar e salvar a sessao... ")

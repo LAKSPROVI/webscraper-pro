@@ -96,6 +96,19 @@ export JUSBRASIL_PASSWORD="sua_senha"
 
 Observacao: se houver CAPTCHA, 2FA ou challenge adicional, o modo automatico pode nao concluir sozinho.
 
+Refresh nao-interativo de uma sessao existente (seed-state), mantendo o mesmo proxy:
+
+```bash
+.venv/bin/python scripts/export_jusbrasil_storage_state.py \
+  --output sessions/jusbrasil.storage-state.refreshed.json \
+  --seed-state sessions/jusbrasil.storage-state.json \
+  --headless \
+  --refresh-only \
+  --proxy-server "$JUSBRASIL_PLAYWRIGHT_PROXY_SERVER" \
+  --proxy-username "$JUSBRASIL_PLAYWRIGHT_PROXY_USERNAME" \
+  --proxy-password "$JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD"
+```
+
 ### Request via API
 
 Exemplo de request com spider dedicado:
