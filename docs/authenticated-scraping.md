@@ -34,6 +34,14 @@ Nao dependa de automacao de login, quebra de captcha, bypass de MFA ou evasao de
   - usuario do proxy fixo.
 - `JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD`
   - senha do proxy fixo.
+- `JUSBRASIL_WARMUP_URLS_JSON`
+  - lista JSON de URLs para pré-navegação no mesmo contexto autenticado.
+- `JUSBRASIL_WARMUP_WAIT_MS`
+  - espera entre cada URL de warm-up em milissegundos.
+- `JUSBRASIL_TARGET_WAIT_SELECTOR`
+  - seletor CSS para aguardar carregamento da página alvo.
+- `JUSBRASIL_TARGET_WAIT_MS`
+  - timeout de espera da navegação/selector em milissegundos.
 
 ## Uso pratico
 
@@ -107,6 +115,15 @@ Exemplo de request com spider dedicado:
 2. Referenciar o caminho em `JUSBRASIL_STORAGE_STATE_PATH` no ambiente do worker.
 3. Reiniciar apenas os services `webscraper-*`.
 4. Rodar o teste no endpoint de scrape.
+
+Exemplo recomendado de warm-up autenticado:
+
+```bash
+export JUSBRASIL_WARMUP_URLS_JSON='["https://www.jusbrasil.com.br/","https://www.jusbrasil.com.br/login"]'
+export JUSBRASIL_WARMUP_WAIT_MS='2000'
+export JUSBRASIL_TARGET_WAIT_SELECTOR='body'
+export JUSBRASIL_TARGET_WAIT_MS='12000'
+```
 
 ### Automacao via script
 

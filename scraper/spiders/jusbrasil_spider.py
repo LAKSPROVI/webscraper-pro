@@ -77,6 +77,25 @@ class JusbrasilSpider(scrapy.Spider):
             "playwright_proxy_password",
             "JUSBRASIL_PLAYWRIGHT_PROXY_PASSWORD",
         )
+        warmup_urls = self._resolve_json(
+            "warmup_urls",
+            "JUSBRASIL_WARMUP_URLS_JSON",
+        )
+        self.warmup_urls = self._normalize_str_list(warmup_urls)
+        self.warmup_wait_ms = self._resolve_int(
+            "warmup_wait_ms",
+            "JUSBRASIL_WARMUP_WAIT_MS",
+            default=1500,
+        )
+        self.target_wait_selector = self._resolve_str(
+            "target_wait_selector",
+            "JUSBRASIL_TARGET_WAIT_SELECTOR",
+        )
+        self.target_wait_ms = self._resolve_int(
+            "target_wait_ms",
+            "JUSBRASIL_TARGET_WAIT_MS",
+            default=8000,
+        )
         cookies_json = self._resolve_json(
             "cookies_json",
             "JUSBRASIL_COOKIES_JSON",
@@ -108,6 +127,28 @@ class JusbrasilSpider(scrapy.Spider):
         for key, header_value in cast(dict[Any, Any], value).items():
             normalized[str(key)] = str(header_value)
         return normalized
+
+    def _normalize_str_list(self, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        normalized: list[str] = []
+        for entry in cast(list[Any], value):
+            text = str(entry).strip()
+            if text:
+                normalized.append(text)
+        return normalized
+
+    def _resolve_int(self, config_key: str, env_name: str, *, default: int) -> int:
+        raw = self.config.get(config_key)
+        if raw is None:
+            raw = os.getenv(env_name)
+        if raw in (None, ""):
+            return default
+        try:
+            return int(str(raw).strip())
+        except ValueError:
+            self._warn("Valor inteiro inválido em %s, usando default=%d", env_name, default)
+            return default
 
     def _resolve_str(self, config_key: str, env_name: str) -> str | None:
         value = self.config.get(config_key) or os.getenv(env_name)
@@ -216,6 +257,27 @@ class JusbrasilSpider(scrapy.Spider):
 
         if page is not None:
             try:
+                for warmup_url in self.warmup_urls:
+                    try:
+                        await page.goto(warmup_url, wait_until="domcontentloaded", timeout=self.target_wait_ms)
+                        if self.warmup_wait_ms > 0:
+                            await page.wait_for_timeout(self.warmup_wait_ms)
+                    except Exception as exc:
+                        self._warn("Falha no warm-up URL=%s: %s", warmup_url, exc)
+
+                if self.warmup_urls:
+                    await page.goto(response.url, wait_until="domcontentloaded", timeout=self.target_wait_ms)
+
+                if self.target_wait_selector:
+                    try:
+                        await page.wait_for_selector(self.target_wait_selector, timeout=self.target_wait_ms)
+                    except Exception:
+                        self._warn(
+                            "Selector de espera não encontrado em %s: %s",
+                            response.url,
+                            self.target_wait_selector,
+                        )
+
                 html_text = await page.content()
                 title = (await page.title() or "").strip()
             finally:
@@ -247,6 +309,7 @@ class JusbrasilSpider(scrapy.Spider):
             "render_js": self.render_js,
             "source": "jusbrasil_spider",
             "authenticated_session": bool(self.storage_state_path or self.cookie_header or self.cookies_json),
+            "warmup_urls_used": self.warmup_urls,
         }
 
         yield item
