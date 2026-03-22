@@ -36,7 +36,7 @@ if _PROJECT_ROOT not in sys.path:
 
 try:
     from database.models import ScrapedItem as ScrapedItemModel, ScrapingJob
-    from database.connection import get_async_session, engine
+    from database.connection import get_session
     DB_AVAILABLE = True
 except ImportError as e:
     DB_AVAILABLE = False
@@ -207,7 +207,7 @@ class StoragePipeline:
         """
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        async with get_async_session() as session:
+        async with get_session() as session:
             # Prepara os dados para bulk insert
             # Normaliza o campo metadata_ para o formato do modelo
             insert_data = []
@@ -294,7 +294,7 @@ class StoragePipeline:
         - status: 'done' (se não havia falhas)
         - completed_at: timestamp de conclusão
         """
-        async with get_async_session() as session:
+        async with get_session() as session:
             from sqlalchemy import select, update
 
             # Busca o job para atualização
