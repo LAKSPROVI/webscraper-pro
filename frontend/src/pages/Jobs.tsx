@@ -296,6 +296,7 @@ export default function Jobs() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [onlyOperatorAction, setOnlyOperatorAction] = useState(false)
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
 
   const { data, isLoading, refetch } = useJobs({
@@ -320,7 +321,20 @@ export default function Jobs() {
     progress: (['RUNNING'].includes(['RUNNING', 'DONE', 'DONE', 'FAILED', 'PENDING', 'DONE', 'RUNNING'][i % 7]) ? Math.floor(Math.random() * 80 + 20) : undefined),
   }))
 
-  const displayJobs = data?.items || mockJobs
+  const baseJobs = data?.items || mockJobs
+  const sortedJobs = [...baseJobs].sort((a, b) => {
+    const aNeedsAction = Boolean(a.metadata?.operator_action?.required)
+    const bNeedsAction = Boolean(b.metadata?.operator_action?.required)
+    if (aNeedsAction !== bNeedsAction) {
+      return aNeedsAction ? -1 : 1
+    }
+    return 0
+  })
+  const displayJobs = onlyOperatorAction
+    ? sortedJobs.filter((job) => Boolean(job.metadata?.operator_action?.required))
+    : sortedJobs
+
+  const operatorActionCount = baseJobs.filter((job) => Boolean(job.metadata?.operator_action?.required)).length
   const totalPages = data?.pages || 3
   const total = data?.total || 47
   const operatorActionJob = displayJobs.find((job) => Boolean(job.metadata?.operator_action?.required))
@@ -371,6 +385,18 @@ export default function Jobs() {
           >
             Atualizar
           </NeonButton>
+
+          <NeonButton
+            variant={onlyOperatorAction ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setOnlyOperatorAction((prev) => !prev)
+              setPage(1)
+            }}
+            icon={<AlertTriangle size={13} />}
+          >
+            Ação pendente {operatorActionCount > 0 ? `(${operatorActionCount})` : ''}
+          </NeonButton>
         </div>
       </GlowCard>
 
@@ -382,6 +408,12 @@ export default function Jobs() {
             <span className="text-text-secondary text-sm">
               <span className="text-neon-cyan font-mono font-bold">{total}</span> jobs encontrados
             </span>
+            {operatorActionCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-neon-amber-dim bg-neon-amber-dim px-2 py-0.5 text-xs font-mono text-neon-amber">
+                <AlertTriangle size={10} />
+                {operatorActionCount} com ação manual
+              </span>
+            )}
           </div>
         </div>
 
