@@ -20,10 +20,13 @@ jobs:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_FRONTEND_API_URL: ${{ secrets.DEPLOY_FRONTEND_API_URL || 'https://api-webscraper.jurislaw.com.br' }}
+      DEPLOY_FRONTEND_WS_URL: ${{ secrets.DEPLOY_FRONTEND_WS_URL || 'wss://api-webscraper.jurislaw.com.br' }}
       APP_PATH: /opt/webscraper-pro/app
       FRONT_DIST_PATH: /opt/webscraper-pro/frontend
-      API_HEALTH_URL: ${{ secrets.DEPLOY_API_HEALTH_URL }}
+      API_HEALTH_URL: ${{ secrets.DEPLOY_API_HEALTH_URL || 'https://api-webscraper.jurislaw.com.br/health' }}
 
     steps:
       - name: Checkout target commit
@@ -36,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_PASSWORD; do
+          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_PRIVATE_KEY; do
             if [ -z "${!var:-}" ]; then
               echo "Missing required secret: $var"
               missing=1
@@ -46,24 +49,37 @@ jobs:
             exit 1
           fi
 
-      - name: Install SSH tooling
+      - name: Configure SSH key
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq sshpass
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          if [ -n "${DEPLOY_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            PORT="${DEPLOY_PORT:-22}"
+            ssh-keyscan -p "$PORT" -H "$DEPLOY_HOST" > ~/.ssh/known_hosts
+          fi
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy services on server
         shell: bash
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
-          sshpass -p "$DEPLOY_PASSWORD" ssh \
-            -o PubkeyAuthentication=no \
-            -o PreferredAuthentications=password \
+          FRONTEND_API_URL="${DEPLOY_FRONTEND_API_URL:-}"
+          FRONTEND_WS_URL="${DEPLOY_FRONTEND_WS_URL:-}"
+          ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -p "$PORT" \
-            "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'SH'
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            FRONTEND_API_URL="$FRONTEND_API_URL" \
+            FRONTEND_WS_URL="$FRONTEND_WS_URL" \
+            'bash -s' <<'SH'
           set -euo pipefail
 
           sudo -u webscraper -H bash -lc '
@@ -74,6 +90,12 @@ jobs:
           '
 
           systemctl restart webscraper-api webscraper-worker webscraper-scheduler
+
+          # Escreve o .env.production ANTES do sudo (env vars disponíveis aqui, não dentro do sudo)
+          {
+            echo "VITE_API_URL=${FRONTEND_API_URL}"
+            echo "VITE_WS_URL=${FRONTEND_WS_URL}"
+          } > /opt/webscraper-pro/app/frontend/.env.production
 
           sudo -u webscraper -H bash -lc '
             set -e

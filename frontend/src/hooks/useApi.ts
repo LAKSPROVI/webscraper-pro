@@ -3,8 +3,12 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import type { Job, JobStatus, ScrapedItem } from '../stores/appStore'
 
+function resolveApiBaseUrl(): string {
+  return (import.meta.env.VITE_API_URL as string | undefined) || '/api'
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: resolveApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

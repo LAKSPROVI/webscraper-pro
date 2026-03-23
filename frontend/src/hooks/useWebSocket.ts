@@ -16,7 +16,21 @@ interface UseWebSocketReturn {
   subscribe: (eventType: WSEventType, callback: (data: unknown) => void) => () => void
 }
 
-const BASE_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+function resolveWsBaseUrl(): string {
+  const envWsUrl = import.meta.env.VITE_WS_URL as string | undefined
+  if (envWsUrl) {
+    return envWsUrl
+  }
+
+  if (typeof window === 'undefined') {
+    return 'ws://localhost:8000'
+  }
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${wsProtocol}//${window.location.host}`
+}
+
+const BASE_WS_URL = resolveWsBaseUrl()
 const MAX_BACKOFF = 30000
 
 export function useWebSocket(): UseWebSocketReturn {

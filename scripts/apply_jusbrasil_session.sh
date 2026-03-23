@@ -10,7 +10,7 @@ Uso:
     --host 77.42.68.212 \
     --user webscraper \
     --state-file /caminho/local/storage_state.json \
-    --api-url https://api.77.42.68.212.nip.io
+    --api-url https://api-webscraper.jurislaw.com.br
 
 Parametros obrigatorios:
   --host        Host do servidor

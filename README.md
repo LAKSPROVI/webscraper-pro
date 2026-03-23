@@ -60,8 +60,6 @@ O **WebScraper Pro** é um sistema completo de coleta de dados web (web scraping
 
 ### ⚡ Performance & Escala
 - ✅ Workers Celery distribuídos (escala horizontal)
-- ✅ Pool de conexões HTTP com `httpx` assíncrono
-- ✅ Cache de páginas com Redis (evita re-fetching)
 - ✅ Processamento paralelo de múltiplos domínios
 - ✅ Limite de memória por worker configurável
 - ✅ Retry automático com backoff exponencial
@@ -237,7 +235,7 @@ bash scripts/apply_jusbrasil_session.sh \
   --host 77.42.68.212 \
   --user webscraper \
   --state-file sessions/jusbrasil.storage-state.json \
-  --api-url https://api.77.42.68.212.nip.io
+  --api-url https://api-webscraper.jurislaw.com.br
 ```
 
 Guia completo: `docs/authenticated-scraping.md`
@@ -695,10 +693,18 @@ Secrets necessários no GitHub (Settings -> Secrets and variables -> Actions):
 - `DEPLOY_HOST`: IP/DNS do servidor
 - `DEPLOY_PORT`: porta SSH (opcional, default 22)
 - `DEPLOY_USER`: usuário SSH com privilégios de deploy
-- `DEPLOY_PASSWORD`: senha SSH desse usuário
+- `DEPLOY_SSH_PRIVATE_KEY`: chave privada SSH de deploy (formato OpenSSH)
+- `DEPLOY_KNOWN_HOSTS`: saída do `ssh-keyscan -H <host>` (opcional, recomendado)
 - `DEPLOY_API_HEALTH_URL`: URL de health check pública (opcional)
+- `DEPLOY_FRONTEND_API_URL`: URL pública que o frontend usará para chamadas HTTP (opcional)
+- `DEPLOY_FRONTEND_WS_URL`: URL pública para WebSocket do frontend (opcional)
 
 Com esses secrets configurados, o deploy deixa de depender de execução manual via Codespace.
+
+URLs de produção recomendadas (customizadas):
+
+- Frontend: `https://webscraper.jurislaw.com.br`
+- API: `https://api-webscraper.jurislaw.com.br`
 
 ---
 

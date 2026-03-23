@@ -153,7 +153,7 @@ bash scripts/apply_jusbrasil_session.sh \
   --host 77.42.68.212 \
   --user webscraper \
   --state-file sessions/jusbrasil.storage-state.json \
-  --api-url https://api.77.42.68.212.nip.io
+  --api-url https://api-webscraper.jurislaw.com.br
 ```
 
 O script executa:

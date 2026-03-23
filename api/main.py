@@ -304,11 +304,12 @@ async def handler_http_exception(request: Request, exc: HTTPException) -> JSONRe
     """
     Handler genérico para HTTPException com formato padronizado.
     """
+    detail: Any = exc.detail
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "erro": exc.detail if isinstance(exc.detail, str) else "Erro na requisição",
-            "detalhes": exc.detail if not isinstance(exc.detail, str) else None,
+            "erro": detail if isinstance(detail, str) else "Erro na requisição",
+            "detalhes": detail if not isinstance(detail, str) else None,
             "codigo": exc.status_code,
         },
     )
